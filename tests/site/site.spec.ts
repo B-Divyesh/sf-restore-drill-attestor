@@ -105,6 +105,7 @@ test('visible controls and operational copy meet the product baseline', async ({
 test('deployment policy prevents framing and restricts executable content', async () => {
   const { readFile } = await import('node:fs/promises');
   const policy = JSON.parse(await readFile('site/public/staticwebapp.config.json', 'utf8'));
+  expect(policy.navigationFallback).toBeUndefined();
   expect(policy.globalHeaders['X-Frame-Options']).toBe('DENY');
   expect(policy.globalHeaders['Content-Security-Policy']).toContain("frame-ancestors 'none'");
   expect(policy.globalHeaders['Content-Security-Policy']).toContain("script-src 'self'");
