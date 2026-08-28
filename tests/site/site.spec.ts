@@ -141,6 +141,15 @@ test('sample drill shows success and failure with cleanup', async ({ page }) => 
   await expect(page.locator('[data-stage]').last().locator('small')).toHaveText('Cleanup still completed');
 });
 
+test('reduced-motion mode completes the sample without animated transitions', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/#demo');
+  const transition = await page.locator('[data-stage]').first().evaluate(element => getComputedStyle(element).transitionDuration);
+  expect(Number.parseFloat(transition)).toBeLessThanOrEqual(0.001);
+  await page.getByRole('button', { name: 'Run sample drill' }).press(' ');
+  await expect(page.locator('[data-sheet-status]')).toHaveText('PASSED', { timeout: 1_500 });
+});
+
 test('returned purchase strips token and unlocks after verification', async ({ page }) => {
   await page.route('https://api.sociobot.in/**', route => route.fulfill({
     status: 200,
@@ -237,6 +246,8 @@ test('first-screen sample action enters an isolated, resettable demo namespace',
   await expect(page).toHaveTitle('Demo — Restore Drill Attestor');
   await expect(page.locator('[data-demo-banner]')).toBeVisible();
   await expect(page.locator('[data-operator-content]')).toBeHidden();
+  await expect(page.locator('.demo-recording')).toContainText('restore-drill demo');
+  await expect(page.locator('.demo-recording')).toContainText('PASSED: restore, 3 checks, and cleanup completed.');
   await expect(page.locator('[data-sheet-status]')).toHaveText('PASSED', { timeout: 6_000 });
   expect(await page.evaluate(() => localStorage.getItem('sb_license:restore-drill-attestor'))).toBe('real-license');
   await page.getByRole('button', { name: 'Reset demo' }).click();

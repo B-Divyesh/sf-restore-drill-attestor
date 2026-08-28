@@ -1,136 +1,115 @@
-# Restore Drill Attestor — verification-3 handoff
-
-## Independent acceptance result: FAIL
-
-Candidate `8b93ccbda146fd5a3cc5ea552aab19509d49dfd0` was independently verified against <https://restore-drill-attestor.sociobot.in> on 2026-08-28 UTC. Full evidence: `.factory/verification-3.md`.
-
-Release blockers:
-
-1. `.factory/claims.json` is missing, so no required claims can be run and verified from a clean demo entry point.
-2. The first screen lacks “Try it with sample data,” does not name the intended audience, and has no compliant demo mode.
-3. The CLI lacks `demo`/`--demo`, and `.factory/demo.md` is absent.
-4. Live Operator Pack checkout returns HTTP 404.
-
-Fresh positive evidence: install, lint, 16 unit/integration tests, production build, 20 local and 20 live browser checks, package verification, and a clean installed-consumer sample drill pass. Browser artifacts match the candidate. The license verify endpoint is now rate-limited (130/160 burst requests returned HTTP 429 with `Retry-After`).
-
-No product code was modified by this verifier. The factory must address the blockers and request re-verification.
-
----
-
-# Previous builder handoff (superseded by independent verification above)
+# Restore Drill Attestor — repair 3 handoff
 
 ## Outcome
 
-Repository repair commit `400a4f557983b90e3dd9668d4d9efc5d59675dc0` is pushed to
-`main` and its static landing site is deployed at
-<https://restore-drill-attestor.sociobot.in>. It repairs both CLI findings from
-the independent report: privacy-safe evidence now omits **all** user-supplied
-labels, and one local process holds an OS-backed lock for each declared target
-until cleanup and durable evidence finish.
+Repository repairs are deployed at
+<https://restore-drill-attestor.sociobot.in>. Source commits `79a5e03` and
+`673888a` are pushed to `main`. Azure Static Web Apps deployment
+`19abe644-0bac-4c65-b5fd-c5a883b6e757` serves the final build.
 
-Release acceptance is still blocked by two live, factory-owned billing API
-dependencies. Workers are explicitly prohibited from changing billing or
-infrastructure in this repository:
+All repository-owned findings in `.factory/verification-3.md` are repaired:
 
-1. At 2026-08-28 08:33 UTC, `GET https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout`
-   returned HTTP `404` and `{"error":"enabled factory product","status":404}`.
-   The factory must enable/register the product so the $39 Operator Pack
-   checkout redirects to hosted checkout.
-2. An 80-request burst at parallelism 20 to the production `verify` endpoint
-   returned `80 × HTTP 200`, with no observed `429` or `Retry-After`. The
-   factory must apply endpoint rate limiting before release.
-
-The site preserves its required Sociobot checkout URL, local optimistic
-license behavior, and free CLI experience. No payment, API, or infrastructure
-code was added here.
-
-## Repairs
-
-- Attestation schema v2 replaces check labels with neutral `check-1`,
-  `check-2`, etc. It also no longer serializes the user-provided drill or
-  target label, and uses a neutral `restore-drill-<timestamp>` filename. The
-  existing SHA-256 configuration fingerprint remains the local correlation
-  mechanism. README, privacy page, and the attestation privacy statement now
-  state this exact boundary.
-- Added low-dependency `fs2` locking. A SHA-256-derived opaque lock file under
-  the local temp directory is exclusively locked by the OS before the first
-  lifecycle command and released only after cleanup/evidence. A same-target
-  contender exits `2` as a configuration/safety refusal before executing any
-  command; different targets can still run concurrently. OS lock release also
-  prevents stale locks after a process crash.
+- `.factory/claims.json` now maps six public claims one-to-one to tagged,
+  observable sandbox tests. Every listed command passed independently.
+- `restore-drill demo` and `restore-drill demo --json` run the bundled
+  `examples/demo-backup.tsv` through the real engine in a uniquely named
+  temporary directory. The command performs restore, row-count, schema, and
+  application checks, removes the disposable target, retains the attestation,
+  and prints its path. It does not read the caller's files.
+- The first screen now states the job and audience directly. Its primary
+  action opens `/?demo=1#demo` in one click and states the resulting outcome.
+  Demo mode has a persistent banner, reset and exit controls, an isolated
+  `demo:` browser-storage namespace, and a recording of the real CLI command.
+- Open Graph and Twitter metadata, a 180px Apple touch icon, a 1200×630 social
+  image, `sitemap.xml`, and a designed 404 page are shipped. Removing the
+  unnecessary SPA fallback fixed the live unknown-route status from 200 to
+  404.
+- `.factory/demo.md`, `.factory/copy-audit.md`, README, changelog, design
+  provenance, and regression documentation are current.
 
 ## Exact regression coverage
 
-- Rust unit test injects `QA_SECRET_8c8b1` into a drill label, target ID, and
-  check name, then proves the token is absent from serialized evidence while
-  neutral check IDs remain.
-- Rust CLI integration starts a slow first process, waits until it owns the
-  target, then proves a second process exits `2` with the machine-readable
-  configuration error. Only the owning process cleans up and writes one
-  attestation.
-- Existing sequential filename-allocation coverage remains; concurrent
-  different-target runs retain distinct attestations.
+- Rust integration: `demo_command_runs_bundled_sample_in_a_temporary_sandbox`
+  starts in an unrelated directory, protects a sentinel file, asserts a passed
+  attestation under the system temp directory, proves target cleanup, and
+  rejects bundled values and labels in evidence.
+- Playwright claim tests: `@claim:demo-sandbox`,
+  `@claim:evidence-minimization`, `@claim:target-safety`,
+  `@claim:offline-reload`, `@claim:site-local-only`, and
+  `@claim:operator-pack`.
+- Browser regression checks cover the one-click demo transition, demo reset and
+  exit, isolation from a valid real-license cache, the real CLI transcript,
+  social metadata, icon assets, XML sitemap, 404 deployment policy, axe,
+  keyboard focus, reduced motion, offline reload/update, privacy, and license
+  reconciliation.
 
-## Verification performed
+## Verification evidence — 28 August 2026 UTC
 
-All commands were run after `npm ci` (61 packages; audit zero vulnerabilities)
-on 2026-08-28 UTC.
+Clean and local gates:
+
+```text
+npm ci                                      PASS; 61 packages; 0 vulnerabilities
+npm run lint                                PASS; fmt, strict Clippy, TypeScript
+npm test                                    PASS; 10 unit + 4 integration + 3 Vitest
+npm run build                               PASS; release CLI + dist/site
+npm run test:e2e -- --workers=4             PASS; 36/36 desktop + 390×844
+all six .factory/claims.json commands       PASS individually
+npm audit --omit=dev                        PASS; 0 vulnerabilities
+cargo package --locked --allow-dirty        PASS; 11 files, 65.5 KiB / 19.3 KiB
+clean packaged-crate install and consumer   PASS
+installed restore-drill demo --json         PASS; target_removed=true
+installed shipped example                   PASS; passed evidence in 152 ms
+```
+
+The final static payload is 6,631 B JavaScript, 17,696 B CSS, 41,344 B font,
+43,858 B mobile art, and 146,742 B desktop art. Local Lighthouse 12.8.2 scored
+100 performance, 100 accessibility, 100 best practices, and 100 SEO; LCP was
+1.5 s, CLS 0.007, and total blocking time 0 ms.
+
+Live gates after deployment:
+
+```text
+factory verify-url.sh                       PASS; HTTPS 200; 891 ms; no errors
+Playwright desktop + 390×844 mobile         PASS; 36/36
+Lighthouse 12.8.2                           100 / 100 / 100 / 100
+LCP / CLS / total blocking time             1.2 s / 0.007 / 0 ms
+/sitemap.xml                                200 text/xml
+/privacy/ and /terms/                       200 text/html
+/this-page-does-not-exist                   404; designed 404 body
+apple-touch-icon.png / og-image.jpg         200; correct image types
+```
+
+Live response headers include HSTS, CSP with `script-src 'self'` and
+`frame-ancestors 'none'`, `X-Frame-Options: DENY`, nosniff, restrictive
+permissions, and strict-origin referrer policy. The static product has no
+account or sign-in flow; its only identity-like state is the locally stored
+optional license token. The license verifier's rate limit was independently
+confirmed in verification 3 and this repair did not change that endpoint.
+
+## Remaining factory-owned release blocker
+
+The required production checkout is still not registered or enabled outside
+this repository. Immediately after the final deployment,
+`GET https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout`
+returned HTTP 404 with `{"error":"enabled factory product","status":404}`.
+The test endpoint returns the same response. This worker has no billing
+registration tool or billing credential, and repository policy prohibits
+changing billing infrastructure. The prescribed checkout URL and complete
+client-side purchase-return, restore-license, daily verification, optimistic
+offline, and revocation behavior remain intact. The factory must register and
+enable this product in the Sociobot billing engine before acceptance.
+
+## Run, verify, and publish
 
 ```sh
 npm ci
 npm run lint
 npm test
 npm run build
-npx playwright test --workers=4
-npm audit --omit=dev
-cargo package --locked --allow-dirty
-```
-
-- `npm run lint`: Rust formatting, strict Clippy, and TypeScript passed.
-- `npm test`: 10 Rust unit tests, 3 Rust integration tests, and 3 Vitest tests
-  passed.
-- `npm run build`: release CLI and `dist/site/` passed. Final static payload:
-  6,131 B JS, 16,733 B CSS, 41,344 B self-hosted font, 43,858 B mobile art,
-  146,742 B desktop art.
-- Local Playwright: all 20 tests pass across Chromium desktop and 390×844
-  mobile. These cover serious/critical axe findings, keyboard focus, reduced
-  motion, 44px targets and 16px text, first-party requests, licensing,
-  service-worker update, offline reload, and legal pages.
-- `cargo package --locked --allow-dirty`: passed and verified a 10-file
-  package (59.7 KiB uncompressed; 17.7 KiB compressed). A clean consumer root
-  installed the packaged CLI and ran the shipped example successfully,
-  producing a passed attestation.
-- Static deployment: `/opt/fleet/lib/deploy-static.sh restore-drill-attestor
-  dist/site` succeeded as Azure deployment
-  `68d5fb0f-0b7a-42e9-852c-c3e9a87ddb3e`; custom domain status is Ready.
-- Post-deploy factory verifier: live HTTPS 200, 708 ms network-idle load, no
-  console/page errors; title, `lang=en`, exactly one H1, main landmark, and
-  image alt text all present. Live headers include HSTS, restrictive CSP with
-  `frame-ancestors 'none'`, `X-Frame-Options: DENY`, strict-origin referrer
-  policy, Permissions-Policy, correct HTML cache policy, and no identity flow
-  (this is a static, sign-in-free product).
-- Live Playwright: all 20 tests pass across the same desktop and mobile
-  projects, including axe, keyboard, offline/update, clean first-party load,
-  license states, and legal pages.
-
-Lighthouse was invoked against the deployed site with the pinned Playwright
-Chromium path, but its browser tab crashed during screenshot collection in the
-container before it emitted a score. The full local/live browser and factory
-verifier checks above passed; a prior independent run recorded 100/100/100/100
-for performance/accessibility/best-practices/SEO. Re-run Lighthouse in a
-non-constrained browser container if a fresh score artifact is required.
-
-## How to run and publish
-
-```sh
-cargo install --git https://github.com/B-Divyesh/sf-restore-drill-attestor.git --locked
-restore-drill --help
-```
-
-For a registry-ready crate, the factory should run:
-
-```sh
+npm run test:e2e
 cargo package --locked
+restore-drill demo
 ```
 
-Registry publishing remains factory-owned; do not publish from this worktree.
+Registry publication remains factory-owned; do not publish from this
+worktree.
