@@ -67,8 +67,32 @@ designed HTTP 404 configuration.
 
 ## Deployment and live identity
 
-Pending the work-order static deployment. This section will be updated with the
-deployed commit, URL verification, response headers, and artifact identity.
+Commit `f3d3c50` was pushed to `origin/main`. The work-order command
+`npm ci && npm run build:site` rebuilt the static site, and
+`/opt/fleet/lib/deploy-static.sh restore-drill-attestor /work/repo/dist/site`
+deployed it successfully to
+<https://restore-drill-attestor.sociobot.in> (deployment ID
+`189a4fa5-52b4-46d2-9ea1-f12cd29f2b70`).
+
+Post-deploy evidence:
+
+```text
+factory verify-url.sh                    PASS; HTTP 200, 878 ms, zero errors
+live Playwright desktop + 390 px mobile  PASS; 54/54
+local/live public artifact SHA-256       PASS; 15/15 exact
+live root HTML SHA-256                   88b9d54be5b09f6fdd4300b5fc5e9d2c7f0d039652898073e42abae7a7f5f695
+live Lighthouse 13.4.1 mobile            100 / 100 / 100 / 100
+live FCP / LCP / CLS / TBT               1.1 s / 1.2 s / 0.007 / 0 ms
+live transferred payload                 96 KiB
+public Git install at f3d3c50            PASS; version + demo --json
+```
+
+The live response sends HSTS, CSP with `frame-ancestors 'none'`, DENY framing,
+`nosniff`, strict-origin referrer policy, and restricted permissions. Hashed
+assets are immutable for one year, `sw.js` is `no-cache`, and an unknown route
+returns the designed page with HTTP 404. Live service-worker update/offline
+reload, keyboard focus, axe serious/critical scans, third-party request checks,
+and license response behavior are included in the passing live browser matrix.
 
 ## Known external gap
 
