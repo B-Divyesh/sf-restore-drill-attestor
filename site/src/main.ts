@@ -130,8 +130,6 @@ select<HTMLButtonElement>('[data-fail-demo]')?.addEventListener('click', () => v
 
 if (demoMode) {
   document.title = 'Demo — Restore Drill Attestor';
-  const banner = select<HTMLElement>('[data-demo-banner]');
-  if (banner) banner.hidden = false;
   window.setTimeout(() => void runDemo(false), 0);
 }
 

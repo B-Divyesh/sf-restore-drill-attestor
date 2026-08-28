@@ -315,6 +315,24 @@ test('sample drill shows success and failure with cleanup', async ({ page }) => 
   await expect(page.locator('[data-stage]').last().locator('small')).toHaveText('Cleanup still completed');
 });
 
+test('verification 7 regression: direct demo reserves its banner before first layout', async ({ page }) => {
+  await page.addInitScript(() => {
+    const shifts: number[] = [];
+    new PerformanceObserver(entries => {
+      for (const entry of entries.getEntries() as PerformanceEntry[]) {
+        const shift = entry as PerformanceEntry & { hadRecentInput?: boolean; value?: number };
+        if (!shift.hadRecentInput && typeof shift.value === 'number') shifts.push(shift.value);
+      }
+    }).observe({ type: 'layout-shift', buffered: true });
+    (window as Window & { __rdaLayoutShifts?: number[] }).__rdaLayoutShifts = shifts;
+  });
+  await page.goto('/?demo=1');
+  await expect(page.locator('[data-demo-banner]')).toBeVisible();
+  await expect(page.locator('[data-sheet-status]')).toHaveText('PASSED', { timeout: 6_000 });
+  const cls = await page.evaluate(() => (window as Window & { __rdaLayoutShifts?: number[] }).__rdaLayoutShifts?.reduce((total, value) => total + value, 0) || 0);
+  expect(cls).toBeLessThan(0.1);
+});
+
 test('reduced-motion mode completes the sample without animated transitions', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/#demo');

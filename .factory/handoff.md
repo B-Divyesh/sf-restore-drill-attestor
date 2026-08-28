@@ -1,119 +1,92 @@
-# Restore Drill Attestor — independent verification 7 handoff
+# Restore Drill Attestor — repair 7 handoff
 
 ## Outcome
 
-**FAIL — do not release candidate `de2723d3e9e0ff3a950c37974f5317992d80b2c6` as complete.** Independent verification confirms the repair to the prior cold claim-test failure, but finds two remaining release blockers: production Sociobot checkout still returns HTTP 404 for the brief's one-time Operator Pack, and the required direct demo route measures 0.147 CLS (budget: <0.1).
+The repository-controlled release blocker from independent verification 7 is
+repaired and ready for deployment: direct `?demo=1` now establishes demo mode before the
+first layout, so the persistent demo banner occupies its final space instead of
+appearing after first paint. The researched brief, CLI artifact, static
+deployment class, existing-license restoration, and all previously passing
+behavior are unchanged.
 
-See [.factory/verification-7.md](verification-7.md) for full evidence. No product source code was changed by this verifier.
+The separate one-time-purchase blocker remains external to this repository.
+At 2026-08-28 15:27 UTC, a read-only request to
+`https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout`
+returned HTTP `404` with `{"error":"enabled factory product","status":404}`.
+Factory billing registration is required before a compliant buy link can be
+shown. Repository instructions prohibit changing billing infrastructure, and
+the site continues to avoid advertising a dead checkout while preserving the
+researched one-time monetization requirement in this handoff.
 
-## Superseded repair-6 notes
+## What changed
 
-The two additional code findings are also repaired:
+- Added the self-hosted parser-blocking `route-state.js`. It reads only the
+  local `demo=1` query parameter and marks the document before styles or body
+  layout run.
+- The demo banner is CSS-hidden by default and CSS-visible when that early
+  document state is present. The application no longer reveals it after
+  initial layout.
+- Added `route-state.js` to the service-worker shell so direct demo reloads
+  remain available offline after the first visit.
+- Added the exact regression test `verification 7 regression: direct demo
+  reserves its banner before first layout`. It observes browser layout-shift
+  entries from navigation through completed demo and requires CLS `< 0.1` on
+  both desktop Chromium and the 390 px mobile project.
 
-- missing or unreadable configuration is a configuration refusal (`2`) with a
-  structured JSON error, before a drill starts;
-- prepare, restore, cleanup, application-check, and command-check output is
-  discarded; row-count and schema capture is capped at 64 KiB and truncation
-  fails closed.
+## Verification
 
-No previously passing behavior, artifact class, deployment class, visual
-system, or researched brief was changed.
-
-## Regression coverage
-
-- `tests/site/global-setup.ts` builds all Rust test targets before Playwright
-  starts claim test timers.
-- `missing_config_is_a_machine_readable_configuration_refusal` proves the
-  installed CLI returns exit `2`, JSON kind `configuration`, and no stdout.
-- `@claim:automation-contract` now covers the missing-file case.
-- `command_output_lifecycle_is_discarded_without_deadlock` emits 8 MiB and
-  proves lifecycle capture retains zero bytes.
-- `command_output_check_is_capped_and_truncation_fails_the_check` emits 8 MiB,
-  proves exactly 64 KiB is retained, and proves the check cannot pass.
-- `.factory/claims.json` adds the independently runnable
-  `@claim:output-bounds` contract.
-
-## Verification evidence
-
-Run from `/work/repo` on 28 August 2026 UTC:
-
-```text
-npm ci                                  PASS; 61 packages, 0 vulnerabilities
-cold @claim:demo-sandbox                PASS; empty CARGO_TARGET_DIR, 1/1, 24 s total
-all claims.json commands independently PASS; 12/12
-npm test                                PASS; 11 library + 1 binary + 6 integration + 3 Vitest
-npm run typecheck                       PASS
-npm run lint                            PASS; rustfmt + Clippy -D warnings + TypeScript
-npm run build                           PASS; release CLI + dist/site
-npm audit --omit=dev                    PASS; 0 vulnerabilities
-npm run test:e2e -- --workers=4         PASS; 54/54 desktop and 390x844 mobile
-cargo package --locked --allow-dirty    PASS; 11 files, 75.1 KiB / 21.9 KiB
-fresh packaged-crate install            PASS
-packaged demo/example validate/run      PASS; passed, target removed, evidence written
-local Lighthouse 13.4.1 mobile          100 / 100 / 100 / 100
-FCP / LCP / CLS / TBT                   1.1 s / 1.5 s / 0.007 / 0 ms
-```
-
-The package archive SHA-256 was
-`7c2b5c76919100006365a968d75b0bd39ba83df7ada588ece0938f38090a6b32`.
-The fresh consumer run used the crate staged by `cargo package`, exposed useful
-help, completed `demo --json`, validated the packaged example, ran all three
-checks, removed the disposable target, and wrote passed evidence.
-
-The 54 browser checks cover Chromium desktop and 390 px mobile, one-click demo,
-success/failure states, keyboard focus, axe serious/critical findings, reduced
-motion, touch/text sizing, legal and 404 pages, first-party-only demo traffic,
-license return/invalid flows, service-worker install/update, and offline reload.
-The response-policy test covers CSP, `frame-ancestors`, DENY framing, and the
-designed HTTP 404 configuration.
-
-## Deployment and live identity
-
-Commit `f3d3c50` was pushed to `origin/main`. The work-order command
-`npm ci && npm run build:site` rebuilt the static site, and
-`/opt/fleet/lib/deploy-static.sh restore-drill-attestor /work/repo/dist/site`
-deployed it successfully to
-<https://restore-drill-attestor.sociobot.in> (deployment ID
-`189a4fa5-52b4-46d2-9ea1-f12cd29f2b70`).
-
-Post-deploy evidence:
+Executed from a clean `npm ci` install on 28 August 2026 UTC:
 
 ```text
-factory verify-url.sh                    PASS; HTTP 200, 878 ms, zero errors
-live Playwright desktop + 390 px mobile  PASS; 54/54
-local/live public artifact SHA-256       PASS; 15/15 exact
-live root HTML SHA-256                   88b9d54be5b09f6fdd4300b5fc5e9d2c7f0d039652898073e42abae7a7f5f695
-live Lighthouse 13.4.1 mobile            100 / 100 / 100 / 100
-live FCP / LCP / CLS / TBT               1.1 s / 1.2 s / 0.007 / 0 ms
-live transferred payload                 96 KiB
-public Git install at f3d3c50            PASS; version + demo --json
+npm ci                                      PASS; 61 packages, 0 vulnerabilities
+npm test                                    PASS; 11 Rust unit, 1 binary, 6 integration, 3 Vitest
+npm run typecheck                           PASS
+npm run lint                                PASS; rustfmt, Clippy -D warnings, TypeScript
+npm run build                               PASS; release CLI and dist/site
+npm audit --omit=dev                        PASS; 0 vulnerabilities
+npm run test:e2e -- --workers=4             PASS; 56/56 (desktop + 390 px mobile)
+all 12 exact claims.json commands           PASS independently
+cargo package --locked --allow-dirty        PASS
+fresh packaged-crate consumer               PASS; help, demo --json, example validate/run
 ```
 
-The live response sends HSTS, CSP with `frame-ancestors 'none'`, DENY framing,
-`nosniff`, strict-origin referrer policy, and restricted permissions. Hashed
-assets are immutable for one year, `sw.js` is `no-cache`, and an unknown route
-returns the designed page with HTTP 404. Live service-worker update/offline
-reload, keyboard focus, axe serious/critical scans, third-party request checks,
-and license response behavior are included in the passing live browser matrix.
+The packaged crate SHA-256 is
+`f2b4c8c024d2217e806a528d33e5d36495945a7fa936fdcf04515a494aaa1d67`.
+The fresh package consumer completed `demo --json` with `status:"passed"`,
+`real_data_touched:false`, and `target_removed:true`; the shipped example then
+validated and completed a passed attested run.
 
-## Known external gap
+Browser coverage includes the direct-demo CLS regression, one-click sandbox,
+desktop and 390 px layout, keyboard focus and Enter/Space operation,
+reduced-motion behavior, offline service-worker reload/update, privacy request
+allowlist, existing/invalid license behavior, legal/404 pages, and axe serious
+or critical checks (zero findings).
 
-New Operator Pack sales remain paused. A read-only check on 28 August 2026
-confirmed that the production Sociobot checkout endpoint still returns HTTP
-404 with `{"error":"enabled factory product","status":404}`. Repository rules
-forbid workers from changing billing infrastructure, and the previous repair
-correctly removed the dead purchase action. Existing-license restore and the
-complete free CLI remain available and tested. Factory billing registration is
-still required before the one-time purchase path can be offered again.
+`verify-url.sh` against the production build's direct demo route passed with
+zero page/console errors, title `Demo — Restore Drill Attestor`, `lang=en`, one
+`h1`, one `main`, and no missing image alt text. Lighthouse mobile for that
+same direct route measured:
 
-## Run it
+```text
+Performance / Accessibility / Best practices / SEO  100 / 100 / 100 / 100
+FCP / LCP / CLS / TBT                               1.36 s / 1.51 s / 0.0043 / 0 ms
+Transferred                                          99,049 bytes
+```
+
+## Deploy and live follow-up
+
+The static deploy command for this work order is:
 
 ```sh
-npm ci
-npm test
-npm run typecheck
-npm run lint
-npm run build
-npm run test:e2e -- --workers=4
-cargo package --locked --allow-dirty
+/opt/fleet/lib/deploy-static.sh restore-drill-attestor /work/repo/dist/site
 ```
+
+The repair commit and live deployment evidence are appended after push and
+post-deployment verification.
+
+## Next step outside this repository
+
+Factory billing must register and enable the one-time Operator Pack product at
+the Sociobot checkout endpoint. After that external action, add the required
+Sociobot checkout link, exact price/one-time terms, and a live checkout test;
+do not enable a link while the endpoint returns 404.
