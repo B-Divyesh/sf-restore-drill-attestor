@@ -70,8 +70,12 @@ restore-drill run --config restore-drill.toml \
 For automation, add `--json` to print a machine-readable summary. Exit codes
 are `0` for a passed drill, `2` for configuration/safety errors, `3` for a
 restore or check failure, and `4` when cleanup fails. Cleanup is attempted after
-prepare, even when restore or checks fail. The attestation deliberately excludes
-commands, stdout, stderr, row counts, schema values, and secrets.
+prepare, even when restore or checks fail. A local OS-backed lock serializes
+runs for the same `target.id`; a concurrent run refuses before any command is
+started. The attestation deliberately excludes commands, stdout, stderr, every
+user-supplied label (including drill, target, and check names), row counts,
+schema values, and secrets. Use its configuration fingerprint to correlate it
+with a local drill file.
 
 ## Configuration API (v1)
 

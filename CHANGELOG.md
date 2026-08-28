@@ -6,6 +6,8 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- Replace all user-supplied labels with neutral evidence IDs so drill, target, and check names cannot leak into attestations or filenames.
+- Serialize local runs for the same declared target with an OS-backed lock and an early safe refusal.
 - Refuse concatenated production-like target IDs before any command starts.
 - Preserve every attestation when runs begin in the same second.
 - Emit structured errors when `--json` is requested.

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Days, SecondsFormat, Utc};
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -73,8 +74,6 @@ pub struct Attestation {
     pub schema_version: u8,
     pub attestation_id: String,
     pub tool: Tool,
-    pub drill: String,
-    pub target_id: String,
     pub config_sha256: String,
     pub started_at: String,
     pub completed_at: String,
@@ -109,7 +108,8 @@ pub struct StageEvidence {
 
 #[derive(Debug, Serialize)]
 pub struct CheckEvidence {
-    pub name: String,
+    /// A stable ordinal for this run. User-controlled check labels are never evidence.
+    pub check_id: String,
     pub kind: CheckKind,
     pub status: &'static str,
     pub duration_ms: u128,
@@ -273,6 +273,12 @@ pub fn run(
         )));
     }
 
+    // Hold this before the first command and until evidence is durable. This is
+    // deliberately keyed only by the target, not the output directory: two
+    // schedulers may choose different evidence locations while still pointing
+    // commands at the same disposable database or container.
+    let _target_lock = acquire_target_lock(&config.target.id)?;
+
     let started_at = Utc::now();
     let run_timer = Instant::now();
     let mut stages = Vec::new();
@@ -299,11 +305,11 @@ pub fn run(
     }
 
     if !failed {
-        for check in &config.checks {
+        for (index, check) in config.checks.iter().enumerate() {
             let result = run_command(&check.command, check.timeout_seconds)?;
             let passed = check_passed(check, &result);
             checks.push(CheckEvidence {
-                name: check.name.clone(),
+                check_id: format!("check-{}", index + 1),
                 kind: check.kind,
                 status: if passed { "passed" } else { "failed" },
                 duration_ms: result.duration_ms,
@@ -334,16 +340,14 @@ pub fn run(
         .unwrap_or(completed_at);
     let config_hash = format!("{:x}", Sha256::digest(source.as_bytes()));
     let timestamp = started_at.format("%Y%m%dT%H%M%SZ").to_string();
-    let attestation_id = format!("{}-{timestamp}", slug(&config.drill.name));
+    let attestation_id = format!("restore-drill-{timestamp}");
     let mut attestation = Attestation {
-        schema_version: 1,
+        schema_version: 2,
         attestation_id: attestation_id.clone(),
         tool: Tool {
             name: "restore-drill-attestor",
             version: env!("CARGO_PKG_VERSION"),
         },
-        drill: config.drill.name.clone(),
-        target_id: config.target.id.clone(),
         config_sha256: config_hash,
         started_at: timestamp_string(started_at),
         completed_at: timestamp_string(completed_at),
@@ -352,31 +356,72 @@ pub fn run(
         status,
         stages,
         checks,
-        privacy: "No commands, stdout, stderr, query results, schema values, or secrets recorded.",
+        privacy: "No commands, stdout, stderr, query results, schema values, check labels, or secrets recorded.",
     };
     let path = write_attestation(output_dir, &mut attestation)?;
     Ok(RunResult { attestation, path })
 }
 
-fn timestamp_string(value: DateTime<Utc>) -> String {
-    value.to_rfc3339_opts(SecondsFormat::Secs, true)
+/// A process-scoped advisory lock for a declared restore target.
+///
+/// `fs2` delegates to the operating system, so a crash releases the lock
+/// automatically. The lock files themselves are harmless, opaque markers in
+/// the system temp directory and intentionally contain no target identifier.
+struct TargetLock {
+    file: fs::File,
 }
 
-fn slug(value: &str) -> String {
-    let slug: String = value
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() {
-                character.to_ascii_lowercase()
-            } else {
-                '-'
-            }
-        })
-        .collect();
-    slug.split('-')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
+impl Drop for TargetLock {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.file);
+    }
+}
+
+fn acquire_target_lock(target_id: &str) -> Result<TargetLock, Error> {
+    let lock_directory = std::env::temp_dir().join("restore-drill-attestor-locks");
+    fs::create_dir_all(&lock_directory).map_err(|error| {
+        Error::Io(format!(
+            "could not create local target-lock directory {}: {error}",
+            lock_directory.display()
+        ))
+    })?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&lock_directory, fs::Permissions::from_mode(0o700)).map_err(
+            |error| {
+                Error::Io(format!(
+                    "could not secure local target-lock directory {}: {error}",
+                    lock_directory.display()
+                ))
+            },
+        )?;
+    }
+
+    let target_digest = format!("{:x}", Sha256::digest(target_id.as_bytes()));
+    let lock_path = lock_directory.join(format!("{target_digest}.lock"));
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)
+        .map_err(|error| Error::Io(format!("could not open local target lock: {error}")))?;
+    match file.try_lock_exclusive() {
+        Ok(()) => Ok(TargetLock { file }),
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => Err(Error::Config(
+            "the declared target is already in use by another restore drill; wait for it to finish"
+                .into(),
+        )),
+        Err(error) => Err(Error::Io(format!(
+            "could not lock declared target: {error}"
+        ))),
+    }
+}
+
+fn timestamp_string(value: DateTime<Utc>) -> String {
+    value.to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 fn write_attestation(output_dir: &Path, attestation: &mut Attestation) -> Result<PathBuf, Error> {
@@ -596,15 +641,46 @@ timeout_seconds = 2
 
     #[test]
     fn documented_kinds_validate_and_run_without_leaking_values() {
-        let cfg = config(VALID);
+        let mut cfg = config(VALID);
+        cfg.target.id = "documented-kinds-test".into();
         validate_config(&cfg).unwrap();
         let directory = tempfile::tempdir().unwrap();
-        let result = run(&cfg, VALID, "local-drill", directory.path()).unwrap();
+        let result = run(&cfg, VALID, "documented-kinds-test", directory.path()).unwrap();
         assert_eq!(result.attestation.status, Status::Passed);
         let evidence = fs::read_to_string(result.path).unwrap();
         assert!(!evidence.contains("migration-202608"));
         assert!(!evidence.contains("printf"));
         assert!(!evidence.contains("12\\n"));
+    }
+
+    #[test]
+    fn attestation_replaces_user_controlled_check_labels_with_neutral_ids() {
+        let secret = "QA_SECRET_8c8b1";
+        let source = VALID
+            .replace(
+                "name = \"test database\"",
+                &format!("name = \"{secret} drill\""),
+            )
+            .replace(
+                "id = \"local-drill\"",
+                &format!("id = \"isolated-{secret}\""),
+            )
+            .replace("name = \"rows\"", &format!("name = \"{secret} check\""));
+        let cfg = config(&source);
+        let directory = tempfile::tempdir().unwrap();
+
+        let result = run(
+            &cfg,
+            &source,
+            &format!("isolated-{secret}"),
+            directory.path(),
+        )
+        .unwrap();
+        let evidence = fs::read_to_string(result.path).unwrap();
+
+        assert!(!evidence.contains(secret));
+        assert!(evidence.contains("\"check_id\": \"check-1\""));
+        assert!(evidence.contains("check labels"));
     }
 
     #[test]
@@ -641,9 +717,10 @@ timeout_seconds = 2
     #[test]
     fn cleanup_runs_after_restore_failure_and_attestation_is_written() {
         let source = VALID.replace("restore = \"true\"", "restore = \"false\"");
-        let cfg = config(&source);
+        let mut cfg = config(&source);
+        cfg.target.id = "cleanup-failure-test".into();
         let directory = tempfile::tempdir().unwrap();
-        let result = run(&cfg, &source, "local-drill", directory.path()).unwrap();
+        let result = run(&cfg, &source, "cleanup-failure-test", directory.path()).unwrap();
         assert_eq!(result.attestation.status, Status::Failed);
         assert_eq!(result.attestation.stages.last().unwrap().stage, "cleanup");
         assert_eq!(result.attestation.stages.last().unwrap().status, "passed");
@@ -651,10 +728,11 @@ timeout_seconds = 2
 
     #[test]
     fn immediate_runs_keep_distinct_attestations() {
-        let cfg = config(VALID);
+        let mut cfg = config(VALID);
+        cfg.target.id = "immediate-evidence-test".into();
         let directory = tempfile::tempdir().unwrap();
-        let first = run(&cfg, VALID, "local-drill", directory.path()).unwrap();
-        let second = run(&cfg, VALID, "local-drill", directory.path()).unwrap();
+        let first = run(&cfg, VALID, "immediate-evidence-test", directory.path()).unwrap();
+        let second = run(&cfg, VALID, "immediate-evidence-test", directory.path()).unwrap();
 
         assert_ne!(first.path, second.path);
         assert_ne!(
@@ -665,12 +743,31 @@ timeout_seconds = 2
     }
 
     #[test]
-    fn concurrent_runs_keep_distinct_attestations() {
-        let cfg = config(VALID);
+    fn concurrent_runs_for_different_targets_keep_distinct_attestations() {
+        let mut first_config = config(VALID);
+        first_config.target.id = "concurrent-evidence-a".into();
+        let mut second_config = config(VALID);
+        second_config.target.id = "concurrent-evidence-b".into();
         let directory = tempfile::tempdir().unwrap();
         let paths = thread::scope(|scope| {
-            let first = scope.spawn(|| run(&cfg, VALID, "local-drill", directory.path()).unwrap());
-            let second = scope.spawn(|| run(&cfg, VALID, "local-drill", directory.path()).unwrap());
+            let first = scope.spawn(|| {
+                run(
+                    &first_config,
+                    VALID,
+                    "concurrent-evidence-a",
+                    directory.path(),
+                )
+                .unwrap()
+            });
+            let second = scope.spawn(|| {
+                run(
+                    &second_config,
+                    VALID,
+                    "concurrent-evidence-b",
+                    directory.path(),
+                )
+                .unwrap()
+            });
             [first.join().unwrap().path, second.join().unwrap().path]
         });
 
