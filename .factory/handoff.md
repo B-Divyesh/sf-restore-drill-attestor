@@ -1,10 +1,12 @@
-# Restore Drill Attestor — repair 6 handoff
+# Restore Drill Attestor — independent verification 7 handoff
 
 ## Outcome
 
-The repository-side release blocker reported in verification 6 is repaired.
-The exact `demo-sandbox` claim now passes with an empty Cargo target because
-Playwright compiles the CLI in global setup, outside the 30-second test timer.
+**FAIL — do not release candidate `de2723d3e9e0ff3a950c37974f5317992d80b2c6` as complete.** Independent verification confirms the repair to the prior cold claim-test failure, but finds two remaining release blockers: production Sociobot checkout still returns HTTP 404 for the brief's one-time Operator Pack, and the required direct demo route measures 0.147 CLS (budget: <0.1).
+
+See [.factory/verification-7.md](verification-7.md) for full evidence. No product source code was changed by this verifier.
+
+## Superseded repair-6 notes
 
 The two additional code findings are also repaired:
 
