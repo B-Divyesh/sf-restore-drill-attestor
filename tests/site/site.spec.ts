@@ -64,6 +64,14 @@ test('@claim:evidence-minimization demo evidence omits sample values, labels, co
   }
 });
 
+test('@claim:output-bounds lifecycle output is discarded and check output is capped', async () => {
+  const { stdout } = await exec('cargo', [
+    'test', '--quiet', '--manifest-path', join(repo, 'Cargo.toml'),
+    'command_output_', '--', '--show-output'
+  ], { cwd: repo, timeout: 60_000 });
+  expect(stdout).toContain('2 passed');
+});
+
 test('@claim:target-safety production-looking targets are refused before commands run', async () => {
   const consumer = await mkdtemp(join(tmpdir(), 'rda-claim-safety-'));
   try {
@@ -127,6 +135,14 @@ test('@claim:automation-contract exit codes and JSON output are stable for autom
   try {
     const demo = JSON.parse((await runCli(['demo', '--json'], consumer)).stdout);
     expect(demo.status).toBe('passed');
+
+    const missing = await failedCli(['validate', '--json', '--config', join(consumer, 'missing.toml')], consumer);
+    expect(missing.code).toBe(2);
+    expect(JSON.parse(missing.stderr)).toMatchObject({
+      ok: false,
+      exit_code: 2,
+      error: { kind: 'configuration' }
+    });
 
     const cases = [
       { id: 'config', target: 'production01', restore: 'true', cleanup: 'true', check: 'true', code: 2, stream: 'stderr', status: undefined },

@@ -88,6 +88,31 @@ command = "true"
 }
 
 #[test]
+fn missing_config_is_a_machine_readable_configuration_refusal() {
+    let directory = tempfile::tempdir().unwrap();
+    let missing = directory.path().join("missing.toml");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_restore-drill"))
+        .args(["validate", "--json", "--config"])
+        .arg(&missing)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(error["ok"], false);
+    assert_eq!(error["exit_code"], 2);
+    assert_eq!(error["error"]["kind"], "configuration");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("could not read configuration")
+    );
+}
+
+#[test]
 fn unsafe_run_refuses_before_any_command_executes() {
     let directory = tempfile::tempdir().unwrap();
     let config = directory.path().join("unsafe.toml");

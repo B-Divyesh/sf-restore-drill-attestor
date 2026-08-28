@@ -100,8 +100,11 @@ with a local drill file.
 - `commands.prepare` is optional. `restore` and `cleanup` are required. Commands
   execute through the platform shell with inherited environment variables.
 - `row_count` requires integer stdout and accepts `min`/`max`; recorded evidence
-  includes only pass/fail and duration.
+  includes only pass/fail and duration. Row-count and schema output is capped at
+  64 KiB and a truncated result fails closed.
 - `schema` requires `contains`; `application` and `command` pass on exit code 0.
+  Output from prepare, restore, cleanup, application, and command checks is
+  discarded instead of retained in memory.
 - `timeout_seconds` defaults to 900 per command and can be set on each check.
 - `attestation_ttl_days` defaults to 30 and is included as `fresh_until`.
 

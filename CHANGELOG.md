@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0 repair 6 — 2026-08-28
+
+- Build the CLI before Playwright starts claim timers so the bundled demo claim
+  remains reliable with an empty Cargo cache.
+- Classify missing and unreadable drill files as configuration refusals with
+  exit code 2 and structured JSON errors.
+- Discard lifecycle-command output and cap row/schema check capture at 64 KiB;
+  truncated check output fails closed.
+
 ## 0.1.0 repair 5 — 2026-08-28
 
 - Stop advertising the Operator Pack checkout while factory billing has no

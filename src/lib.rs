@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
@@ -13,6 +13,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 900;
+const MAX_CHECK_OUTPUT_BYTES: usize = 64 * 1024;
 
 static INTERRUPTED: AtomicBool = AtomicBool::new(false);
 static INTERRUPT_HANDLER: OnceLock<Result<(), String>> = OnceLock::new();
@@ -153,8 +154,15 @@ fn default_timeout() -> u64 {
 }
 
 pub fn load_config(path: &Path) -> Result<(Config, String), Error> {
-    let source = fs::read_to_string(path)
-        .map_err(|error| Error::Io(format!("could not read {}: {error}", path.display())))?;
+    // A missing or unreadable drill file is an input/configuration refusal. It
+    // happens before any drill starts and must not be reported as a drill
+    // execution failure to automation callers.
+    let source = fs::read_to_string(path).map_err(|error| {
+        Error::Config(format!(
+            "could not read configuration {}: {error}",
+            path.display()
+        ))
+    })?;
     let config: Config = toml::from_str(&source)
         .map_err(|error| Error::Config(format!("invalid configuration: {error}")))?;
     validate_config(&config)?;
@@ -296,7 +304,7 @@ pub fn run(
 
     if let Some(prepare) = &config.commands.prepare {
         should_cleanup = true;
-        let result = run_command(prepare, config.commands.timeout_seconds, true)?;
+        let result = run_command(prepare, config.commands.timeout_seconds, true, false)?;
         stages.push(stage("prepare", &result));
         if !result.success {
             failed = true;
@@ -309,6 +317,7 @@ pub fn run(
             &config.commands.restore,
             config.commands.timeout_seconds,
             true,
+            false,
         )?;
         stages.push(stage("restore", &result));
         if !result.success {
@@ -318,7 +327,8 @@ pub fn run(
 
     if !failed {
         for (index, check) in config.checks.iter().enumerate() {
-            let result = run_command(&check.command, check.timeout_seconds, true)?;
+            let capture_output = matches!(check.kind, CheckKind::RowCount | CheckKind::Schema);
+            let result = run_command(&check.command, check.timeout_seconds, true, capture_output)?;
             let passed = check_passed(check, &result);
             checks.push(CheckEvidence {
                 check_id: format!("check-{}", index + 1),
@@ -338,6 +348,7 @@ pub fn run(
         run_command(
             &config.commands.cleanup,
             config.commands.timeout_seconds,
+            false,
             false,
         )?
     } else {
@@ -507,6 +518,7 @@ fn write_attestation(output_dir: &Path, attestation: &mut Attestation) -> Result
 struct CommandResult {
     success: bool,
     stdout: Vec<u8>,
+    stdout_truncated: bool,
     duration_ms: u128,
     timed_out: bool,
     interrupted: bool,
@@ -517,6 +529,7 @@ impl CommandResult {
         Self {
             success: true,
             stdout: Vec::new(),
+            stdout_truncated: false,
             duration_ms: 0,
             timed_out: false,
             interrupted: false,
@@ -528,21 +541,36 @@ fn run_command(
     command: &str,
     timeout_seconds: u64,
     observe_interrupt: bool,
+    capture_stdout: bool,
 ) -> Result<CommandResult, Error> {
     let started = Instant::now();
     let mut process = shell_command(command);
     let mut child = process
-        .stdout(Stdio::piped())
+        .stdout(if capture_stdout {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stderr(Stdio::null())
         .spawn()
         .map_err(|error| Error::Io(format!("could not start drill command: {error}")))?;
-    let stdout = child.stdout.take();
-    let output_reader = thread::spawn(move || {
-        let mut bytes = Vec::new();
-        if let Some(mut output) = stdout {
-            io::Read::read_to_end(&mut output, &mut bytes)?;
-        }
-        Ok::<Vec<u8>, io::Error>(bytes)
+    let output_reader = child.stdout.take().map(|mut output| {
+        thread::spawn(move || {
+            let mut bytes = Vec::with_capacity(MAX_CHECK_OUTPUT_BYTES);
+            let mut buffer = [0_u8; 8192];
+            let mut truncated = false;
+            loop {
+                let count = output.read(&mut buffer)?;
+                if count == 0 {
+                    break;
+                }
+                let remaining = MAX_CHECK_OUTPUT_BYTES.saturating_sub(bytes.len());
+                let retained = remaining.min(count);
+                bytes.extend_from_slice(&buffer[..retained]);
+                truncated |= retained < count;
+            }
+            Ok::<(Vec<u8>, bool), io::Error>((bytes, truncated))
+        })
     });
     let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
     let (success, timed_out, interrupted) = loop {
@@ -567,13 +595,17 @@ fn run_command(
             }
         }
     };
-    let stdout = output_reader
-        .join()
-        .map_err(|_| Error::Io("could not join command output reader".into()))?
-        .map_err(|error| Error::Io(format!("could not read check result: {error}")))?;
+    let (stdout, stdout_truncated) = match output_reader {
+        Some(reader) => reader
+            .join()
+            .map_err(|_| Error::Io("could not join command output reader".into()))?
+            .map_err(|error| Error::Io(format!("could not read check result: {error}")))?,
+        None => (Vec::new(), false),
+    };
     Ok(CommandResult {
         success,
         stdout,
+        stdout_truncated,
         duration_ms: started.elapsed().as_millis(),
         timed_out,
         interrupted,
@@ -632,7 +664,7 @@ fn stage(name: &'static str, result: &CommandResult) -> StageEvidence {
 }
 
 fn check_passed(check: &Check, result: &CommandResult) -> bool {
-    if !result.success || result.timed_out {
+    if !result.success || result.timed_out || result.stdout_truncated {
         return false;
     }
     match check.kind {
@@ -827,15 +859,39 @@ timeout_seconds = 2
     }
 
     #[test]
-    fn command_capture_does_not_deadlock_on_large_output() {
-        let result = run_command("dd if=/dev/zero bs=1024 count=256 2>/dev/null", 2, true).unwrap();
+    fn command_output_lifecycle_is_discarded_without_deadlock() {
+        let result = run_command(
+            "dd if=/dev/zero bs=1048576 count=8 2>/dev/null",
+            2,
+            true,
+            false,
+        )
+        .unwrap();
         assert!(result.success);
-        assert_eq!(result.stdout.len(), 262_144);
+        assert!(result.stdout.is_empty());
+        assert!(!result.stdout_truncated);
+    }
+
+    #[test]
+    fn command_output_check_is_capped_and_truncation_fails_the_check() {
+        let result = run_command(
+            "dd if=/dev/zero bs=1048576 count=8 2>/dev/null",
+            2,
+            true,
+            true,
+        )
+        .unwrap();
+        assert!(result.success);
+        assert_eq!(result.stdout.len(), MAX_CHECK_OUTPUT_BYTES);
+        assert!(result.stdout_truncated);
+
+        let cfg = config(VALID);
+        assert!(!check_passed(&cfg.checks[0], &result));
     }
 
     #[test]
     fn command_timeout_is_recorded() {
-        let result = run_command("sleep 2", 1, true).unwrap();
+        let result = run_command("sleep 2", 1, true, false).unwrap();
         assert!(!result.success);
         assert!(result.timed_out);
         assert!(result.duration_ms < 1_800);

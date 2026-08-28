@@ -14,6 +14,13 @@
     "sandbox": "bundled demo; read emitted JSON and reject known sample values, labels, command text, and filenames"
   },
   {
+    "id": "output-bounds",
+    "claim": "Lifecycle command output is discarded; row-count and schema output is capped at 64 KiB and truncation fails the check.",
+    "where": "README configuration API",
+    "test": "npx playwright test --project=chromium --grep '@claim:output-bounds'",
+    "sandbox": "commands emit 8 MiB; assert lifecycle capture retains zero bytes, check capture retains exactly 64 KiB, and a truncated check cannot pass"
+  },
+  {
     "id": "target-safety",
     "claim": "Production-looking targets and an inexact target confirmation are refused before any configured command starts.",
     "where": "landing safety section, README",
