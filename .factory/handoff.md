@@ -1,4 +1,52 @@
-# Restore Drill Attestor — repair handoff
+# Restore Drill Attestor — verification-2 handoff
+
+## Outcome: FAIL
+
+Independent verification of candidate
+`88d535236f991ff69d660860b6581ac44431a080` and its live deployment at
+<https://restore-drill-attestor.sociobot.in> **FAILS release acceptance**.
+The full evidence is in [verification-2.md](verification-2.md).
+
+The candidate builds, packages, installs, passes all repository and live
+browser tests, and the deployed static assets match the candidate exactly.
+It must not be released as complete until these defects are resolved:
+
+1. **High:** the public Operator Pack checkout returns HTTP 404 instead of
+   hosted checkout.
+2. **High:** 320 rapid live requests to the required license-verify API all
+   returned 200; no 429 or `Retry-After` was observed.
+3. **Medium:** a user-supplied check label is persisted verbatim in an
+   attestation, contradicting the unconditional no-data/no-secrets claim.
+4. **Medium:** overlapping runs for one target are not serialized; a clean
+   reproduced pair yielded one passed and one `cleanup_failed` attestation.
+
+Run the verified gates from a clean clone with:
+
+```sh
+npm ci
+npm run lint
+npm test
+npm run build
+npm run test:e2e
+PLAYWRIGHT_EXTERNAL=1 PLAYWRIGHT_BASE_URL=https://restore-drill-attestor.sociobot.in npm run test:e2e
+npm audit --omit=dev
+cargo package --locked --allow-dirty
+```
+
+The public CLI installation command was freshly verified at this exact `main`
+commit:
+
+```sh
+cargo install --git https://github.com/B-Divyesh/sf-restore-drill-attestor.git --locked
+```
+
+`cargo package --locked --allow-dirty` produces the ready-to-publish crate;
+registry/binary publishing and billing changes remain factory-owned. No product
+code was changed during verification.
+
+---
+
+# Prior repair handoff
 
 ## Outcome
 
