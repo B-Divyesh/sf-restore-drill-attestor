@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f2ead8" />
+    <meta name="description" content="Restore Drill Attestor proves your database backup restores, passes your checks, and is cleaned up—without retaining data values." />
+    <link rel="canonical" href="https://restore-drill-attestor.sociobot.in/" />
+    <title>Restore Drill Attestor — Prove your backup restores</title>
+    <link rel="icon" href="/mark.svg" type="image/svg+xml" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <div class="connection-strip" data-connection role="status" aria-live="polite" hidden></div>
+    <header class="site-header">
+      <a class="wordmark" href="/" aria-label="Restore Drill Attestor home">
+        <span class="mark" aria-hidden="true"><i></i></span>
+        <span>Restore Drill<br />Attestor</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="#install">Install</a>
+        <a href="#demo">Run</a>
+        <a href="#attestation">Inspect</a>
+      </nav>
+      <a class="header-buy" href="#operator-pack">Operator Pack <span>$39</span></a>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span>Recovery test press</span> / v0.1.0</p>
+          <h1 id="hero-title">A backup badge is not a restore.</h1>
+          <p class="lede">Run the real restore. Check what your application needs. Destroy the isolated target. Keep the proof—not the data.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#install">Run your first drill</a>
+            <a class="text-link" href="https://github.com/B-Divyesh/sf-restore-drill-attestor">Read the source <span aria-hidden="true">↗</span></a>
+          </div>
+          <ul class="proof-points" aria-label="Product guarantees">
+            <li><b>Local</b><span>Backup never leaves your environment</span></li>
+            <li><b>Explicit</b><span>Exact target confirmation on every run</span></li>
+            <li><b>Portable</b><span>Plain TOML in, plain JSON out</span></li>
+          </ul>
+        </div>
+        <figure class="hero-art">
+          <picture>
+            <source media="(max-width: 720px)" srcset="/art/restore-proof-press-720.webp" />
+            <img src="/art/restore-proof-press-1200.webp" width="1200" height="800" alt="A four-stage halftone proof press restores a database cylinder, checks it, destroys the copy, and stamps an evidence sheet." fetchpriority="high" />
+          </picture>
+          <figcaption>Fig. 01 — Restore → check → destroy → attest</figcaption>
+        </figure>
+      </section>
+
+      <section class="install-section" id="install" aria-labelledby="install-title">
+        <div class="section-number" aria-hidden="true">01</div>
+        <div class="section-heading">
+          <p class="kicker">Put it beside your restore tooling</p>
+          <h2 id="install-title">One binary. Your commands.</h2>
+          <p>Attestor does not store backups or speak to your provider. It orchestrates the restore path you already own.</p>
+        </div>
+        <div class="terminal" aria-label="Installation and first-run commands">
+          <div class="terminal-bar"><span>shell / restore-drill</span><button class="copy-button" type="button" data-copy-target="install-code">Copy commands</button></div>
+          <pre id="install-code" tabindex="0"><code><span class="prompt">$</span> cargo install restore-drill-attestor
+<span class="prompt">$</span> restore-drill validate --config restore-drill.toml
+<span class="prompt">$</span> restore-drill run --config restore-drill.toml \
+    --confirm local-restore-drill --output ./attestations</code></pre>
+        </div>
+      </section>
+
+      <section class="demo-section" id="demo" aria-labelledby="demo-title">
+        <div class="demo-intro">
+          <p class="kicker">Recorded-output simulator</p>
+          <h2 id="demo-title">See the evidence, not the rows.</h2>
+          <p>The browser demonstration uses invented timings and never connects to a database. The CLI writes the same evidence shape after real commands run locally.</p>
+          <div class="demo-controls">
+            <button class="button primary" type="button" data-run-demo>Run sample drill</button>
+            <button class="button secondary" type="button" data-fail-demo>Simulate failed check</button>
+          </div>
+          <p class="demo-announcer" data-demo-announcer aria-live="polite">Ready to run an isolated sample.</p>
+        </div>
+        <div class="proof-sheet" aria-label="Sample restore drill attestation">
+          <div class="sheet-head">
+            <span>RDA / ATTESTATION</span><span data-sheet-status>NOT RUN</span>
+          </div>
+          <dl class="sheet-meta">
+            <div><dt>Drill</dt><dd>primary-postgres</dd></div>
+            <div><dt>Target</dt><dd>local-restore-drill</dd></div>
+            <div><dt>Evidence</dt><dd>outcomes + durations only</dd></div>
+          </dl>
+          <ol class="stage-list" data-stage-list>
+            <li data-stage><span class="stage-icon">1</span><span><b>Prepare target</b><small>Waiting</small></span><time>—</time></li>
+            <li data-stage><span class="stage-icon">2</span><span><b>Restore backup</b><small>Waiting</small></span><time>—</time></li>
+            <li data-stage><span class="stage-icon">3</span><span><b>Run 3 checks</b><small>Waiting</small></span><time>—</time></li>
+            <li data-stage><span class="stage-icon">4</span><span><b>Destroy target</b><small>Waiting</small></span><time>—</time></li>
+          </ol>
+          <div class="sheet-stamp" data-sheet-stamp aria-hidden="true">AWAITING DRILL</div>
+          <p class="sheet-foot">No commands · No stdout · No stderr · No data values</p>
+        </div>
+      </section>
+
+      <section class="attestation-section" id="attestation" aria-labelledby="attestation-title">
+        <div class="section-number" aria-hidden="true">02</div>
+        <div class="section-heading">
+          <p class="kicker">Compact by design</p>
+          <h2 id="attestation-title">Proof you can hand over.</h2>
+          <p>The attestation shows whether recovery worked, how long each operation took, the configuration fingerprint, and when the drill becomes stale.</p>
+        </div>
+        <div class="evidence-fields">
+          <div><span>included</span><b>Pass/fail state</b></div>
+          <div><span>included</span><b>Stage durations</b></div>
+          <div><span>included</span><b>Fresh-until date</b></div>
+          <div class="excluded"><span>excluded</span><b>Database values</b></div>
+          <div class="excluded"><span>excluded</span><b>Command output</b></div>
+          <div class="excluded"><span>excluded</span><b>Secrets</b></div>
+        </div>
+      </section>
+
+      <section class="safety-section" aria-labelledby="safety-title">
+        <div class="safety-symbol" aria-hidden="true"><span>!</span></div>
+        <div><p class="kicker">A hard boundary, not a checkbox</p><h2 id="safety-title">Production-looking targets are refused.</h2></div>
+        <div class="safety-copy"><p>The config must declare an isolated target. The run must repeat its exact ID. Names containing <code>prod</code>, <code>production</code>, or <code>live</code> are rejected before any command starts.</p><p>Attestor proves restore mechanics. It does not provide network isolation or ransomware protection; those remain your responsibility.</p></div>
+      </section>
+
+      <section class="pricing-section" id="operator-pack" aria-labelledby="pricing-title">
+        <div class="pricing-copy">
+          <p class="kicker">Optional one-time unlock</p>
+          <h2 id="pricing-title">The CLI stays useful. The pack standardizes the team.</h2>
+          <p>Operator Pack adds local scheduling recipes, a recovery review agenda, and a multi-database evidence policy template. Pay once; keep the files.</p>
+          <ul>
+            <li>GitHub Actions and cron scheduling recipes</li>
+            <li>30-day evidence review checklist</li>
+            <li>Multi-database ownership matrix template</li>
+          </ul>
+          <p class="legal-note">Sociobot/Dodo is the merchant of record. Refunds are handled there and revoke the license automatically. <a href="/terms/">Terms</a> · <a href="/privacy/">Privacy</a></p>
+        </div>
+        <div class="price-ticket">
+          <p>Operator Pack</p><strong><sup>$</sup>39</strong><span>one-time purchase</span>
+          <a class="button primary buy-button" href="https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout">Buy the Operator Pack</a>
+          <button class="text-button" type="button" data-show-license>Have a license? Paste it</button>
+          <form class="license-form" data-license-form hidden>
+            <label for="license-token">License token</label>
+            <div><input id="license-token" name="license" type="password" autocomplete="off" required /><button type="submit">Verify</button></div>
+          </form>
+          <p class="license-status" data-license-status role="status" aria-live="polite"></p>
+        </div>
+        <div class="operator-content" data-operator-content hidden>
+          <div class="unlock-head"><span>LICENSE ACTIVE</span><b>Operator Pack / local copy</b></div>
+          <h3>Recovery evidence policy</h3>
+          <pre id="pack-template" tabindex="0"><code>cadence_days: 30
+failure_owner: on-call-platform
+required_checks: [row_count, schema, application]
+evidence_retention_days: 365
+escalate_after_failed_drills: 1</code></pre>
+          <button class="copy-button dark" type="button" data-copy-target="pack-template">Copy policy</button>
+          <details><summary>GitHub Actions schedule</summary><pre tabindex="0"><code>schedule:
+  - cron: "17 3 1 * *"
+workflow_dispatch:</code></pre></details>
+          <details><summary>Monthly review agenda</summary><ol><li>Confirm each protected database has evidence under 30 days old.</li><li>Review restore and cleanup durations for drift.</li><li>Assign every failed drill before closing the review.</li></ol></details>
+        </div>
+      </section>
+
+      <section class="closing" aria-labelledby="closing-title">
+        <p class="eyebrow">Do not wait for the incident.</p>
+        <h2 id="closing-title">Make restore confidence a file you can show.</h2>
+        <a class="button paper" href="#install">Install Restore Drill Attestor</a>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wordmark"><span class="mark" aria-hidden="true"><i></i></span><span>Restore Drill<br />Attestor</span></div>
+      <p>Vendor-neutral recovery evidence for small teams.<br />No telemetry. No backup storage. No data upload.</p>
+      <nav aria-label="Footer navigation"><a href="https://github.com/B-Divyesh/sf-restore-drill-attestor">Source</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></nav>
+      <p class="copyright">© 2026 Sociobot · MIT licensed</p>
+    </footer>
+  </body>
+</html>

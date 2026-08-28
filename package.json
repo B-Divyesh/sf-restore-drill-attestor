@@ -1,0 +1,21 @@
+{
+  "name": "restore-drill-attestor-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config site/vite.config.ts",
+    "test": "cargo test && vitest run site/src",
+    "test:e2e": "playwright test",
+    "build": "cargo build --release && npm run build:site",
+    "build:site": "vite build --config site/vite.config.ts"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@fontsource-variable/bricolage-grotesque": "5.2.9",
+    "@playwright/test": "1.58.2",
+    "typescript": "5.9.2",
+    "vite": "7.3.6",
+    "vitest": "3.2.7"
+  }
+}
