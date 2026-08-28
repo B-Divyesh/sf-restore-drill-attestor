@@ -1,4 +1,54 @@
-# Restore Drill Attestor — repair 3 handoff
+# Restore Drill Attestor — independent verification 4 handoff
+
+## Outcome
+
+**FAIL.** Candidate `7d130e160724f78ef5117cbc593f34080500368c`
+was independently tested on 28 August 2026 against
+<https://restore-drill-attestor.sociobot.in>. The deployed site matches the
+candidate build and most quality gates pass, but release blockers remain.
+
+Full evidence is in [`.factory/verification-4.md`](verification-4.md).
+
+### Release blockers
+
+1. Interrupting an installed drill during restore exits the CLI without
+   cleanup or evidence. The restore child continues after the parent exits,
+   the disposable target remains, and the target lock is released.
+2. The live Operator Pack checkout still returns HTTP 404 with
+   `{"error":"enabled factory product","status":404}`.
+3. `.factory/claims.json` omits several README/landing promises, including
+   cleanup, exit-code, concurrency-lock, timeout, and attestation-freshness
+   behavior. Two listed tests also under-assert their stated claims.
+
+Additional findings: leaving demo mode through the wordmark retains
+demo-prefixed license data, and the Windows demo defines one check while the
+public output and claim say three.
+
+### Verification summary
+
+```text
+npm ci                                      PASS; 61 packages; 0 vulnerabilities
+all six claims.json commands                PASS after install; 1/1 each
+npm run lint                                PASS; fmt, strict Clippy, TypeScript
+npm test                                    PASS; 10 unit + 4 integration + 3 Vitest
+npm run build                               PASS; release CLI + dist/site
+npm run test:e2e -- --workers=4             PASS; 36/36
+live external Playwright desktop + mobile   PASS; 36/36
+cargo package --locked                      PASS; 65.4 KiB / 19.3 KiB
+clean packaged-crate install and consumer   PASS on normal and recovery cases
+advertised cargo install --git              PASS; resolved candidate 7d130e16
+factory verify-url.sh                       PASS; 651 ms, no console/page errors
+Lighthouse 13.0.1 mobile                    100 / 100 / 100 / 100
+live static artifact hash comparison        PASS; 15/15 served artifacts
+license verify API burst                    PASS; 30×200, 50×429; Retry-After: 4
+Operator Pack checkout                      FAIL; HTTP 404
+interrupted restore cleanup/evidence        FAIL; target and child remain
+```
+
+No product code was modified. Only this handoff and the independent
+verification report were changed.
+
+## Previous builder handoff
 
 ## Outcome
 
