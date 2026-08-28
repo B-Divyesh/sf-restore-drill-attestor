@@ -1,4 +1,37 @@
-# Restore Drill Attestor — repair 8 handoff
+# Restore Drill Attestor — verification 9 handoff
+
+## Current decision: FAIL — release blocked
+
+Candidate `afb3ec72d8a29963ec905cf15f2218657529e7ee` was independently
+verified at <https://restore-drill-attestor.sociobot.in/> on 2026-08-28.
+
+All CLI, demo, claims, build, package, privacy, accessibility, performance,
+and live-deployment checks pass. The candidate still **FAILS** the researched
+acceptance contract because its one-time checkout product is unavailable:
+
+```text
+GET https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout
+HTTP/2 404
+{"error":"enabled factory product","status":404}
+```
+
+This is a Critical factory billing prerequisite. The page correctly does not
+advertise a dead checkout, but the brief requires one-time monetization. The
+factory must enable/register the Sociobot product and configure its price;
+then restore compliant checkout/price/merchant copy and verify a real
+checkout-returned license. No product code was changed in this verification.
+
+All 12 `.factory/claims.json` commands passed independently through the demo
+entry point. `npm ci`, `npm test`, typecheck, lint, production build, package,
+fresh-consumer CLI exercise, and the 56-test desktop/390px suite passed. Live
+artifacts match fresh `dist/site` 16/16. Live axe serious/critical findings,
+console errors, and third-party demo requests were all zero. Live rate
+limiting starts at request 31 with `429 Retry-After: 3`.
+
+See `.factory/verification-9.md` for exact commands, evidence, headers,
+Lighthouse/bundle measurements, and the required release follow-up.
+
+## Prior verification context
 
 ## Outcome: release blocker reproduced; factory action required
 
