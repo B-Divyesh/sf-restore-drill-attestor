@@ -260,6 +260,36 @@ test('social metadata, touch icon, sitemap, and designed 404 are shipped', async
   expect(results.violations.filter(violation => ['critical', 'serious'].includes(violation.impact || ''))).toEqual([]);
 });
 
+test('verification 5 regression: unavailable checkout is not advertised', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('a[href*="/checkout"]')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /buy the operator pack/i })).toHaveCount(0);
+  await expect(page.getByText('New licenses are not currently offered.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Restore an existing license' })).toBeVisible();
+
+  await page.goto('/terms/');
+  await expect(page.getByRole('heading', { name: 'Existing Operator Pack licenses' })).toBeVisible();
+  await expect(page.getByText('New Operator Pack licenses are not currently offered.', { exact: false })).toBeVisible();
+});
+
+test('verification 5 regression: public privacy copy stays within tested attestation behavior', async ({ page }) => {
+  const stalePromises = [
+    'Backups and checks stay in your environment.',
+    'No backup storage.',
+    'No data upload.'
+  ];
+
+  await page.goto('/');
+  const landingCopy = await page.locator('body').innerText();
+  for (const promise of stalePromises) expect(landingCopy).not.toContain(promise);
+  await expect(page.getByText('Attestations omit restored values and command output.')).toBeVisible();
+
+  await page.goto('/privacy/');
+  const privacyCopy = await page.locator('main').innerText();
+  for (const promise of stalePromises) expect(privacyCopy).not.toContain(promise);
+  await expect(page.getByText('Those commands keep your account\'s file and network access.')).toBeVisible();
+});
+
 test('sample drill shows success and failure with cleanup', async ({ page }) => {
   await page.goto('/#demo');
   await page.getByRole('button', { name: 'Run sample drill' }).click();
@@ -278,7 +308,7 @@ test('reduced-motion mode completes the sample without animated transitions', as
   await expect(page.locator('[data-sheet-status]')).toHaveText('PASSED', { timeout: 1_500 });
 });
 
-test('returned purchase strips token and unlocks after verification', async ({ page }) => {
+test('returned license strips token and unlocks after verification', async ({ page }) => {
   await page.route('https://api.sociobot.in/**', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -346,20 +376,20 @@ test('keyboard flows retain visible focus', async ({ page }) => {
   expect(Number.parseFloat(focusStyle.outlineWidth)).toBeGreaterThanOrEqual(3);
   expect(focusStyle.boxShadow).not.toBe('none');
 
-  await page.getByRole('button', { name: 'Have a license? Paste it' }).focus();
+  await page.getByRole('button', { name: 'Restore an existing license' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByLabel('License token')).toBeFocused();
 });
 
-test('@claim:operator-pack the page states the one-time price and verifies a restored license', async ({ page }) => {
+test('@claim:operator-pack the page verifies an existing license without gating the free CLI', async ({ page }) => {
   await page.route('https://api.sociobot.in/**', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({ valid: true, reason: 'ok', expires_at: null })
   }));
   await page.goto('/?license=claim-token#operator-pack');
-  await expect(page.locator('.price-ticket')).toContainText('$39');
-  await expect(page.locator('.price-ticket')).toContainText('one-time purchase');
+  await expect(page.locator('.price-ticket')).toContainText('Existing license');
+  await expect(page.locator('.price-ticket')).toContainText('New sales are paused');
   await expect(page.locator('[data-operator-content]')).toBeVisible();
   await expect(page.locator('[data-license-status]')).toContainText('License active');
   await expect(page.locator('.pricing-section')).toContainText('GitHub Actions and cron scheduling recipes');
@@ -396,7 +426,7 @@ test('every same-tab exit from demo discards demo-prefixed storage', async ({ pa
     body: JSON.stringify({ valid: true, reason: 'ok', expires_at: null })
   }));
   await page.goto('/?demo=1#operator-pack');
-  await page.getByRole('button', { name: 'Have a license? Paste it' }).click();
+  await page.getByRole('button', { name: 'Restore an existing license' }).click();
   await page.getByLabel('License token').fill('demo-only-token');
   await page.getByRole('button', { name: 'Verify', exact: true }).click();
   await expect(page.locator('[data-license-status]')).toContainText('License active');
@@ -413,7 +443,7 @@ test('an invalid license relocks paid content without blocking the free product'
     body: JSON.stringify({ valid: false, reason: 'revoked', expires_at: null })
   }));
   await page.goto('/?license=revoked-token');
-  await expect(page.locator('[data-license-status]')).toContainText('no longer active');
+  await expect(page.locator('[data-license-status]')).toContainText('not active');
   await expect(page.locator('[data-operator-content]')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Run sample drill' })).toBeEnabled();
 });

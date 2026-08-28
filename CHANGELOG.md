@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0 repair 5 — 2026-08-28
+
+- Stop advertising the Operator Pack checkout while factory billing has no
+  enabled product, while preserving restoration for existing licenses.
+- Scope privacy language to the attestation fields covered by release claims
+  and explain that configured commands retain the operator's access.
+- Add browser regressions for the unavailable checkout and rejected privacy
+  promises.
+
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]

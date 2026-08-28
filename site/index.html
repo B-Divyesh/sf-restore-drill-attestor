@@ -37,7 +37,7 @@
         <a href="#demo">Run</a>
         <a href="#attestation">Inspect</a>
       </nav>
-      <a class="header-buy" href="#operator-pack">Operator Pack <span>$39</span></a>
+      <a class="header-buy" href="#operator-pack">Restore license</a>
     </header>
 
     <main id="main">
@@ -52,9 +52,9 @@
             <a class="text-link" href="https://github.com/B-Divyesh/sf-restore-drill-attestor">Read source on GitHub <span aria-hidden="true">↗</span></a>
           </div>
           <ul class="proof-points" aria-label="Product facts">
-            <li><b>Private</b><span>Backups and checks stay in your environment.</span></li>
+            <li><b>Private</b><span>Attestations omit restored values and command output.</span></li>
             <li><b>Offline</b><span>Docs and demo reload after your first visit.</span></li>
-            <li><b>$0 CLI</b><span>Operator Pack is $39 once.</span></li>
+            <li><b>$0 CLI</b><span>Install and run without a license.</span></li>
           </ul>
         </div>
         <figure class="hero-art">
@@ -71,7 +71,7 @@
         <div class="section-heading">
           <p class="kicker">Put it beside your restore tooling</p>
           <h2 id="install-title">One binary. Your commands.</h2>
-          <p>Attestor does not store backups or speak to your provider. It orchestrates the restore path you already own.</p>
+          <p>Attestor records outcomes and durations, not backup contents. It orchestrates the restore commands you provide.</p>
         </div>
         <div class="terminal" aria-label="Installation and first-run commands">
           <div class="terminal-bar"><span>shell / restore-drill</span><button class="copy-button" type="button" data-copy-target="install-code">Copy commands</button></div>
@@ -147,20 +147,19 @@ No existing configuration, backup, or target was read or changed.</code></pre>
 
       <section class="pricing-section" id="operator-pack" aria-labelledby="pricing-title">
         <div class="pricing-copy">
-          <p class="kicker">Optional one-time pack</p>
-          <h2 id="pricing-title">The CLI stays useful. The pack standardizes the team.</h2>
-          <p>Operator Pack adds local scheduling recipes, a recovery review agenda, and a multi-database evidence policy template. Pay once; keep the files.</p>
+          <p class="kicker">Existing Operator Pack</p>
+          <h2 id="pricing-title">Restore files you already licensed.</h2>
+          <p>New licenses are not currently offered. Existing licenses still restore scheduling recipes, a recovery review agenda, and a multi-database evidence policy template.</p>
           <ul>
             <li>GitHub Actions and cron scheduling recipes</li>
             <li>30-day evidence review checklist</li>
             <li>Multi-database ownership matrix template</li>
           </ul>
-          <p class="legal-note">Sociobot/Dodo is the merchant of record. Refunds are handled there and revoke the license automatically. <a href="/terms/">Terms</a> · <a href="/privacy/">Privacy</a></p>
+          <p class="legal-note">The free CLI includes the complete drill runner, safety checks, and attestation export. <a href="/terms/">Terms</a> · <a href="/privacy/">Privacy</a></p>
         </div>
         <div class="price-ticket">
-          <p>Operator Pack</p><strong><sup>$</sup>39</strong><span>one-time purchase</span>
-          <a class="button primary buy-button" href="https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout">Buy the Operator Pack</a>
-          <button class="text-button" type="button" data-show-license>Have a license? Paste it</button>
+          <p>Operator Pack</p><strong>Existing license</strong><span>New sales are paused.</span>
+          <button class="text-button" type="button" data-show-license>Restore an existing license</button>
           <form class="license-form" data-license-form hidden>
             <label for="license-token">License token</label>
             <div><input id="license-token" name="license" type="password" autocomplete="off" required /><button type="submit">Verify</button></div>
@@ -192,7 +191,7 @@ workflow_dispatch:</code></pre></details>
 
     <footer>
       <div class="wordmark"><span class="mark" aria-hidden="true"><i></i></span><span>Restore Drill<br />Attestor</span></div>
-      <p>Vendor-neutral recovery evidence for small teams.<br />No telemetry. No backup storage. No data upload.</p>
+      <p>Vendor-neutral recovery evidence for small teams.<br />No website analytics. Attestations omit restored values.</p>
       <nav aria-label="Footer navigation"><a href="https://github.com/B-Divyesh/sf-restore-drill-attestor">Source on GitHub</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></nav>
       <p class="copyright">Built by Param Factory · v0.1.0 · © 2026 Sociobot · MIT</p>
     </footer>

@@ -148,8 +148,7 @@ h3 { font-size: 1.75rem; }
 .price-ticket::before, .price-ticket::after { content: ""; position: absolute; left: 22px; right: 22px; height: 1px; border-top: 2px dashed var(--line); }
 .price-ticket::before { top: 19px; }.price-ticket::after { bottom: 19px; }
 .price-ticket > p { margin: 8px 0 0; text-transform: uppercase; font-size: 1rem; font-weight: 800; }
-.price-ticket > strong { display: block; margin: 12px 0 0; font-family: var(--display); font-size: 5.2rem; line-height: 1; }
-.price-ticket > strong sup { font-size: 1.5rem; vertical-align: top; }
+.price-ticket > strong { display: block; margin: 12px 0 4px; font-family: var(--display); font-size: 2.25rem; line-height: 1; }
 .price-ticket > span { display: block; margin-bottom: 26px; color: var(--muted); font-size: 1rem; }
 .buy-button { width: 100%; }
 .text-button { width: 100%; margin-top: 16px; background: transparent; text-decoration: underline; }

@@ -10,11 +10,11 @@ sentences. No sentence exceeds 22 words. No banned marketing word remains.
 | 5 | Prove your database backup restores. | Pass |
 | 17 | For indie SaaS operators and small platform teams who need repeatable recovery evidence without retaining restored data. | Pass |
 | 9 | It runs a four-stage sample and shows the evidence. | Pass |
-| 7 | Backups and checks stay in your environment. | Pass |
+| 7 | Attestations omit restored values and command output. | Pass |
 | 8 | Docs and demo reload after your first visit. | Pass |
-| 5 | Operator Pack is $39 once. | Pass |
-| 10 | Attestor does not store backups or speak to your provider. | Pass |
-| 8 | It orchestrates the restore path you already own. | Pass |
+| 6 | Install and run without a license. | Pass |
+| 8 | Attestor records outcomes and durations, not backup contents. | Pass |
+| 7 | It orchestrates the restore commands you provide. | Pass |
 | 6 | See the evidence, not the rows. | Pass |
 | 7 | This preview replays the bundled CLI demo. | Pass |
 | 17 | The real command creates a temporary target, runs three checks, removes it, and prints the evidence path. | Pass |
@@ -27,21 +27,19 @@ sentences. No sentence exceeds 22 words. No banned marketing word remains.
 | 12 | Names containing prod, production, or live are rejected before any command starts. | Pass |
 | 4 | Attestor proves restore mechanics. | Pass |
 | 13 | It does not provide network isolation or ransomware protection; those remain your responsibility. | Pass |
-| 4 | The CLI stays useful. | Pass |
-| 5 | The pack standardizes the team. | Pass |
-| 16 | Operator Pack adds local scheduling recipes, a recovery review agenda, and a multi-database evidence policy template. | Pass |
-| 5 | Pay once; keep the files. | Pass |
-| 7 | Sociobot/Dodo is the merchant of record. | Pass |
-| 9 | Refunds are handled there and revoke the license automatically. | Pass |
+| 5 | Restore files you already licensed. | Pass |
+| 6 | New licenses are not currently offered. | Pass |
+| 16 | Existing licenses still restore scheduling recipes, a recovery review agenda, and a multi-database evidence policy template. | Pass |
+| 13 | The free CLI includes the complete drill runner, safety checks, and attestation export. | Pass |
+| 4 | New sales are paused. | Pass |
 | 10 | Confirm each protected database has evidence under 30 days old. | Pass |
 | 7 | Review restore and cleanup durations for drift. | Pass |
 | 8 | Assign every failed drill before closing the review. | Pass |
 | 6 | Do not wait for the incident. | Pass |
 | 8 | Make restore confidence a file you can show. | Pass |
 | 6 | Vendor-neutral recovery evidence for small teams. | Pass |
-| 2 | No telemetry. | Pass |
-| 3 | No backup storage. | Pass |
-| 3 | No data upload. | Pass |
+| 3 | No website analytics. | Pass |
+| 4 | Attestations omit restored values. | Pass |
 | 9 | Demo — sample data, nothing is saved to your work. | Pass |
 | 9 | Offline — cached documentation and the free demo remain available. | Pass |
 | 6 | License verification will resume when connected. | Pass |
@@ -51,12 +49,12 @@ sentences. No sentence exceeds 22 words. No banned marketing word remains.
 | 8 | Cleanup still passed and failure evidence is ready. | Pass |
 | 3 | License saved locally. | Pass |
 | 7 | Verification will retry when you are online. | Pass |
-| 2 | Purchase returned. | Pass |
-| 3 | Verifying your license. | Pass |
+| 2 | License received. | Pass |
+| 2 | Verifying it. | Pass |
 | 2 | License active. | Pass |
 | 5 | Operator Pack is available below. | Pass |
-| 5 | License is no longer active. | Pass |
-| 6 | You can purchase a new license. | Pass |
+| 4 | License is not active. | Pass |
+| 7 | Check the token and try again. | Pass |
 | 5 | Could not verify right now. | Pass |
 | 8 | The free CLI and documentation are still available. | Pass |
 | 7 | Paste the complete license token to continue. | Pass |

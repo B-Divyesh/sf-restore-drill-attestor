@@ -6,7 +6,7 @@ the result, and writes compact JSON evidence. After prepare starts, cleanup is
 attempted for passed, failed, timed-out, and interrupted drills.
 
 It is for indie SaaS operators and small platform teams who need recovery
-evidence without sending backups or production data to another service.
+evidence that excludes restored values, command output, labels, and secrets.
 
 ## Install
 
@@ -128,9 +128,10 @@ npm run test:e2e    # Chromium desktop + 390px mobile
 Public product claims and their exact sandbox checks are listed in
 [.factory/claims.json](.factory/claims.json).
 
-The landing/docs site uses Vite and vanilla TypeScript. It has no analytics,
-third-party runtime assets, or server-side data storage. License tokens for the
-optional Operator Pack are stored locally and verified with Sociobot billing.
+The landing/docs site uses Vite and vanilla TypeScript. It has no analytics or
+third-party runtime assets. Existing Operator Pack license tokens are stored
+locally and verified with Sociobot billing. New licenses are not currently
+offered.
 
 ## Deploy
 
@@ -141,10 +142,11 @@ performed by the factory; this repository does not contain credentials.
 ## Security and privacy
 
 Keep the target disposable and isolated at the network and credential layers.
-This tool verifies recovery mechanics; it does not store backups, provide
-ransomware protection, or prove the semantic correctness of every row. Review
-the generated attestation before sharing it. Report vulnerabilities privately
-to `security@sociobot.in`.
+Configured commands retain your account's file and network access. This tool
+verifies recovery mechanics; it does not provide ransomware protection or prove
+the semantic correctness of every row. Its attestation excludes restored
+values, command output, labels, and secrets. Review that file before sharing it.
+Report vulnerabilities privately to `security@sociobot.in`.
 
 ## License
 

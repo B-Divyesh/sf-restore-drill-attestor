@@ -4,8 +4,8 @@
     <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="theme-color" content="#f2ead8" />
     <meta name="description" content="Privacy policy for Restore Drill Attestor." />
     <link rel="canonical" href="https://restore-drill-attestor.sociobot.in/privacy/" />
-    <meta property="og:type" content="website" /><meta property="og:title" content="Privacy — Restore Drill Attestor" /><meta property="og:description" content="How Restore Drill Attestor handles local drill, website, and payment data." /><meta property="og:url" content="https://restore-drill-attestor.sociobot.in/privacy/" /><meta property="og:image" content="https://restore-drill-attestor.sociobot.in/og-image.jpg" />
-    <meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="Privacy — Restore Drill Attestor" /><meta name="twitter:description" content="How Restore Drill Attestor handles local drill, website, and payment data." /><meta name="twitter:image" content="https://restore-drill-attestor.sociobot.in/og-image.jpg" />
+    <meta property="og:type" content="website" /><meta property="og:title" content="Privacy — Restore Drill Attestor" /><meta property="og:description" content="How Restore Drill Attestor handles drill evidence, website data, and licenses." /><meta property="og:url" content="https://restore-drill-attestor.sociobot.in/privacy/" /><meta property="og:image" content="https://restore-drill-attestor.sociobot.in/og-image.jpg" />
+    <meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="Privacy — Restore Drill Attestor" /><meta name="twitter:description" content="How Restore Drill Attestor handles drill evidence, website data, and licenses." /><meta name="twitter:image" content="https://restore-drill-attestor.sociobot.in/og-image.jpg" />
     <title>Privacy — Restore Drill Attestor</title>
     <link rel="icon" href="/mark.svg" type="image/svg+xml" /><link rel="apple-touch-icon" href="/apple-touch-icon.png" /><script type="module" src="/src/main.ts"></script>
   </head>
@@ -15,12 +15,11 @@
     <header class="site-header"><a class="wordmark" href="/"><span class="mark" aria-hidden="true"><i></i></span><span>Restore Drill<br />Attestor</span></a><nav aria-label="Legal navigation"><a href="/">Product</a><a href="/terms/">Terms</a></nav></header>
     <main id="main" class="legal-page">
       <p class="eyebrow">Policy / effective 28 August 2026</p>
-      <h1>Privacy stays on your machine.</h1>
-      <p class="lede">Restore Drill Attestor does not collect, transmit, or store backup contents, database values, command output, or usage analytics.</p>
-      <h2>CLI data</h2><p>The CLI runs locally. It reads the configuration you provide and starts your local commands. Its JSON attestation contains an attestation ID, timestamps, durations, statuses, neutral check ordinals, the tool version, and a SHA-256 configuration fingerprint. It deliberately excludes commands, stdout, stderr, all user-supplied labels, query results, schema values, and secrets.</p>
-      <h2>Website and local storage</h2><p>The public website has no analytics or tracking scripts. If you purchase or restore the Operator Pack, your license token and its latest verification verdict are stored in your browser's local storage. The website sends the token only to Sociobot's license verification endpoint. Cached website files may be stored by the service worker for offline use.</p>
-      <h2>Payment</h2><p>Sociobot/Dodo is the merchant of record. Checkout happens on Sociobot's hosted billing service, whose processing and retention terms apply to payment data. This site never receives card details.</p>
-      <h2>Your choices</h2><p>Clear this site's browser storage to remove the local license and cached verdict. Delete generated attestation files to remove local drill evidence. For privacy questions, email <a href="mailto:privacy@sociobot.in">privacy@sociobot.in</a>.</p>
+      <h1>See exactly what evidence contains.</h1>
+      <p class="lede">Attestations contain outcomes and timings. They exclude restored values, command output, user labels, and secrets.</p>
+      <h2>CLI data</h2><p>The CLI reads the configuration you provide and starts its commands through your platform shell. Those commands keep your account's file and network access. The JSON attestation contains an ID, timestamps, durations, statuses, neutral check ordinals, the tool version, and a SHA-256 configuration fingerprint. It excludes commands, stdout, stderr, user-supplied labels, query results, schema values, and secrets.</p>
+      <h2>Website and local storage</h2><p>The public website has no analytics or tracking scripts. When you restore an existing Operator Pack, the license token and latest verification verdict stay in this browser's local storage. The website sends that token only to Sociobot's license verification endpoint. The service worker may cache website files for offline use.</p>
+      <h2>Your choices</h2><p>Clear this site's browser storage to remove the local license and cached verdict. Delete generated attestation files to remove local drill evidence. Review configured commands before running them. For privacy questions, email <a href="mailto:privacy@sociobot.in">privacy@sociobot.in</a>.</p>
       <p><a class="button secondary" href="/">Return to product</a></p>
     </main>
     <footer><p>Vendor-neutral recovery evidence for small teams.</p><nav aria-label="Footer navigation"><a href="/">Product</a><a href="/terms/">Terms</a></nav><p>Built by Param Factory · v0.1.0</p><p class="copyright">© 2026 Sociobot · MIT</p></footer>

@@ -71,9 +71,9 @@
   },
   {
     "id": "operator-pack",
-    "claim": "The $39 one-time Operator Pack can be restored with a valid Sociobot license without gating the free CLI.",
-    "where": "landing pricing section, terms page, README",
+    "claim": "An existing Operator Pack can be restored with a valid Sociobot license without gating the free CLI.",
+    "where": "landing existing-license section, terms page, README",
     "test": "npx playwright test --project=chromium --grep '@claim:operator-pack'",
-    "sandbox": "fresh browser context with a deterministic valid Sociobot verification response; assert price, purchase terms, every named pack item, and that the free sample runner stays enabled"
+    "sandbox": "fresh browser context with a deterministic valid Sociobot verification response; assert every named pack item and that the free sample runner stays enabled"
   }
 ]

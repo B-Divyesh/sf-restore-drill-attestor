@@ -183,7 +183,7 @@ async function verifyLicense(token: string, optimistic = false): Promise<void> {
     const verdict: Verdict = { valid: data.valid === true, reason: data.reason || 'invalid', checkedAt: Date.now(), token };
     localStorage.setItem(localKey(VERDICT_KEY), JSON.stringify(verdict));
     showUnlocked(verdict.valid);
-    setLicenseStatus(verdict.valid ? 'License active. Operator Pack is available below.' : 'License no longer active. You can purchase a new license.', verdict.valid ? 'valid' : 'invalid');
+    setLicenseStatus(verdict.valid ? 'License active. Operator Pack is available below.' : 'License is not active. Check the token and try again.', verdict.valid ? 'valid' : 'invalid');
   } catch {
     setLicenseStatus('Could not verify right now. The free CLI and documentation are still available.', 'quiet');
   }
@@ -198,7 +198,7 @@ function initializeLicense(): void {
     localStorage.setItem(localKey(LICENSE_KEY), token);
     history.replaceState({}, '', returned.cleanUrl);
     showUnlocked(true);
-    setLicenseStatus('Purchase returned. Verifying your license…', 'quiet');
+    setLicenseStatus('License received. Verifying it…', 'quiet');
     void verifyLicense(token, true);
     return;
   }
@@ -206,7 +206,7 @@ function initializeLicense(): void {
   const verdict = parseVerdict(localStorage.getItem(localKey(VERDICT_KEY)));
   if (verdict?.token === token) {
     showUnlocked(verdict.valid);
-    setLicenseStatus(verdict.valid ? 'License active. Operator Pack is available below.' : 'License no longer active.', verdict.valid ? 'valid' : 'invalid');
+    setLicenseStatus(verdict.valid ? 'License active. Operator Pack is available below.' : 'License is not active. Check the token and try again.', verdict.valid ? 'valid' : 'invalid');
   }
   if (!verdict || !verdictIsFresh(verdict, token)) void verifyLicense(token, verdict?.valid === true);
 }
