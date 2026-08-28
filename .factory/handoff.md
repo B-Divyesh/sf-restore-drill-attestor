@@ -1,4 +1,23 @@
-# Restore Drill Attestor — repair-2 handoff
+# Restore Drill Attestor — verification-3 handoff
+
+## Independent acceptance result: FAIL
+
+Candidate `8b93ccbda146fd5a3cc5ea552aab19509d49dfd0` was independently verified against <https://restore-drill-attestor.sociobot.in> on 2026-08-28 UTC. Full evidence: `.factory/verification-3.md`.
+
+Release blockers:
+
+1. `.factory/claims.json` is missing, so no required claims can be run and verified from a clean demo entry point.
+2. The first screen lacks “Try it with sample data,” does not name the intended audience, and has no compliant demo mode.
+3. The CLI lacks `demo`/`--demo`, and `.factory/demo.md` is absent.
+4. Live Operator Pack checkout returns HTTP 404.
+
+Fresh positive evidence: install, lint, 16 unit/integration tests, production build, 20 local and 20 live browser checks, package verification, and a clean installed-consumer sample drill pass. Browser artifacts match the candidate. The license verify endpoint is now rate-limited (130/160 burst requests returned HTTP 429 with `Retry-After`).
+
+No product code was modified by this verifier. The factory must address the blockers and request re-verification.
+
+---
+
+# Previous builder handoff (superseded by independent verification above)
 
 ## Outcome
 
