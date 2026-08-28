@@ -1,76 +1,65 @@
-# Restore Drill Attestor — build handoff
+# Restore Drill Attestor — verification handoff
 
-## Shipped
+## Result: FAIL
 
-- Rust 0.1.0 single-binary CLI (`restore-drill`) with useful `--help`, stable
-  exit codes, JSON automation output, TOML validation, exact destructive-target
-  acknowledgement, and refusal of non-isolated or production-named targets.
-- Restore lifecycle with optional prepare, required restore, declarative
-  row-count/schema/application/command checks, process timeouts, process-group
-  termination on Unix, and cleanup after both success and ordinary drill failure.
-- Timestamped JSON attestations with configuration hash, freshness date,
-  outcomes, and durations. Commands, stdout, stderr, returned counts, schema
-  values, and secrets are excluded.
-- Safe runnable example, MIT license, README/API usage, changelog, and a small
-  ready-to-publish Cargo package.
-- Responsive static product/docs site in the required halftone proof-press
-  direction, including an interactive success/failure demonstration, explicit
-  offline state, service-worker cache, `/privacy/`, `/terms/`, and a one-time
-  $39 Operator Pack using the Sociobot buy/verify/restore-license contract.
-- Original `factory-image` hero artwork with prompt/deployment metadata in
-  `.factory/art/`; shipped WebP variants are 146,742 bytes desktop and 43,858
-  bytes mobile.
+- Candidate: `423981576e854f590e3e6466483a206f63a4df2a`
+- URL: <https://restore-drill-attestor.sociobot.in>
+- Verified: 2026-08-28 UTC
+- Full report: [verification.md](verification.md)
 
-## Build and verification
+The candidate builds, tests, packages, and performs the local restore/check/
+cleanup/attestation job. The live site is byte-for-byte the candidate and passes
+automated accessibility, PWA, privacy, cache, and performance checks. It is not
+ready to release.
 
-From a clean clone:
+## Release blockers
+
+1. **High — safety bypass:** `production01`, `prodwest`, `livedb`, and
+   `myproductionbackup` validate despite the advertised production-name
+   refusal. A confirmed `production01` run executed its restore command.
+2. **High — no installable release:** the live `cargo install
+   restore-drill-attestor` command cannot resolve from crates.io, and the GitHub
+   repository has zero releases.
+3. **High — checkout unavailable:** the production Sociobot checkout URL
+   returns HTTP 404 with `{"error":"enabled factory product","status":404}`.
+
+Additional defects: same-second successful runs overwrite one attestation
+(Medium); multiple mobile/desktop interactive targets are below 44 px and 26
+main-content elements are below 16 px (Medium); JSON mode emits plain-text
+errors and CSP/frame protection are absent (Low).
+
+## Verification summary
+
+From a clean detached clone:
 
 ```sh
 npm ci
 npm test
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
 npm run build
 npm run test:e2e
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo package
+npm audit --omit=dev
+cargo package --locked --allow-dirty
 ```
 
-`npm run build` is the work-order build command. It produces the release binary
-at `target/release/restore-drill` and the deployable static root at `dist/site/`
-with `dist/site/index.html`.
+All commands passed: 6 Rust tests, 3 TypeScript tests, 10 Playwright tests, zero
+npm vulnerabilities, and a verified 15.2 KiB compressed Cargo package. The
+package was installed into a clean consumer and independently exercised for
+success, invalid configuration, exact confirmation, restore/check/cleanup
+failure, timeout, row-count boundaries, output secrecy, and exit codes.
 
-Verified locally on 2026-08-28:
+Live checks found zero serious/critical axe violations, console/page errors,
+failed clean-load requests, or horizontal overflow at desktop and 390 px.
+Keyboard focus, reduced motion, license relock, service-worker update, and
+offline reload worked. Lighthouse 12.8.2 mobile scored 100/100/100/100 with
+FCP 1.2 s, LCP 1.4 s, CLS 0.035, and TBT 0 ms. JS (5,980 B), CSS (16,639 B),
+font (41,344 B), and mobile hero (43,858 B) are within budget.
 
-- `npm test`: 6 Rust tests + 3 TypeScript tests passed.
-- Playwright 1.58.2: 10/10 desktop and 390×844 touch-viewport tests passed.
-  Coverage includes demo success/failure, cleanup evidence, offline notice,
-  license return/verification, mobile overflow, and both legal pages.
-- Axe 4.10.2: zero serious or critical findings on product, privacy, and terms.
-- Factory `verify-url.sh`: HTTP 200; no console/page errors; one H1; title,
-  `lang`, main landmark, image alt, and labelled buttons present. Local measured
-  load was 617 ms.
-- Lighthouse 12.8.2 mobile: Performance 100, Accessibility 100, Best Practices
-  100, SEO 100; FCP 1.1 s, LCP 1.5 s, CLS 0.035, TBT 0 ms.
-- Production payload: 5,980 B JS, 16,639 B CSS, 41,344 B font, 146,742 B hero
-  (desktop). All are below the product budgets.
-- `npm audit`: 0 vulnerabilities.
-- `cargo package --allow-dirty --no-verify`: 10 files, 15.2 KiB compressed.
-- Real example drill completed and wrote a passing, data-free attestation.
+## Next verification
 
-## Known gaps and release notes
-
-- The factory must register the paid product before checkout can succeed. The
-  site intentionally uses the production slug URL and contains no hardcoded
-  billing product ID.
-- The CLI can enforce configuration intent and reject risky names, but it cannot
-  prove network or credential isolation. Operators must supply a genuinely
-  disposable target.
-- Unix process timeouts terminate the whole spawned process group. Windows uses
-  the standard child termination API and was not exercised in this Linux build.
-- Lighthouse numbers are reproducible local preview measurements, not field data.
-
-## Publishing
-
-Do not publish from the worker. The factory can inspect with `cargo package` and
-publish the crate/binaries through its release pipeline. Deploy only `dist/site`;
-no DNS, billing, or infrastructure changes are required in this repository.
+After code fixes and factory release coordination, rerun the commands above,
+install from the public advertised channel, test common production-name
+variants and concurrent same-drill runs, follow the checkout redirect, and
+repeat the live browser/header/Lighthouse audit. Do not publish from a worker;
+registry and billing activation remain factory-owned.
