@@ -1,14 +1,120 @@
 # Restore Drill Attestor
 
-Live: https://restore-drill-attestor.sociobot.in — built by the Param Factory (`cli`).
+Vendor-neutral proof that a database backup really restores. `restore-drill`
+runs your existing restore tooling against an explicitly isolated target, checks
+the result, always cleans up, and writes a compact JSON attestation containing
+durations and outcomes—never query results or command output.
 
-See `.factory/brief.json` for the researched problem this solves and `.factory/design.md` for the visual system.
+It is for indie SaaS operators and small platform teams who need recovery
+evidence without sending backups or production data to another service.
 
-## Develop
+## Install
 
+Download a release binary, or build from source with Rust 1.85+:
+
+```sh
+cargo install --path .
+restore-drill --help
 ```
-npm install
-npm run dev
+
+## Usage
+
+Create `restore-drill.toml`:
+
+```toml
+version = 1
+
+[drill]
+name = "primary-postgres"
+
+[target]
+id = "local-restore-drill"
+isolated = true
+
+[commands]
+prepare = "docker compose up -d drill-db"
+restore = "./ops/restore-latest.sh drill-db"
+cleanup = "docker compose down -v"
+
+[[checks]]
+name = "accounts have rows"
+kind = "row_count"
+command = "psql $DRILL_URL -Atc 'select count(*) from accounts'"
+min = 1
+
+[[checks]]
+name = "migration is present"
+kind = "schema"
+command = "psql $DRILL_URL -Atc 'select version from schema_migrations order by version desc limit 1'"
+contains = "202608"
+
+[[checks]]
+name = "application boots"
+kind = "application"
+command = "DRILL_MODE=1 ./bin/smoke-test"
+```
+
+Validate without running anything, then perform the drill. The confirmation
+must exactly match `target.id`; there is no interactive bypass.
+
+```sh
+restore-drill validate --config restore-drill.toml
+restore-drill run --config restore-drill.toml \
+  --confirm local-restore-drill --output ./attestations
+```
+
+For automation, add `--json` to print a machine-readable summary. Exit codes
+are `0` for a passed drill, `2` for configuration/safety errors, `3` for a
+restore or check failure, and `4` when cleanup fails. Cleanup is attempted after
+prepare, even when restore or checks fail. The attestation deliberately excludes
+commands, stdout, stderr, row counts, schema values, and secrets.
+
+## Configuration API (v1)
+
+- `target.isolated` must be `true`; target IDs containing production-like names
+  are rejected. `--confirm` must match it exactly.
+- `commands.prepare` is optional. `restore` and `cleanup` are required. Commands
+  execute through the platform shell with inherited environment variables.
+- `row_count` requires integer stdout and accepts `min`/`max`; recorded evidence
+  includes only pass/fail and duration.
+- `schema` requires `contains`; `application` and `command` pass on exit code 0.
+- `timeout_seconds` defaults to 900 per command and can be set on each check.
+- `attestation_ttl_days` defaults to 30 and is included as `fresh_until`.
+
+See [`examples/restore-drill.toml`](examples/restore-drill.toml) for a safe,
+runnable local example.
+
+## Develop and verify
+
+```sh
+cargo fmt --check
+cargo test
+cargo build --release
+cargo package --allow-dirty
+npm ci
 npm test
-npm run build   # -> dist/
+npm run build       # CLI release build + static site -> dist/
+npm run build:site  # static site only -> dist/site/
 ```
+
+The landing/docs site uses Vite and vanilla TypeScript. It has no analytics,
+third-party runtime assets, or server-side data storage. License tokens for the
+optional Operator Pack are stored locally and verified with Sociobot billing.
+
+## Deploy
+
+Factory deployment serves `dist/site` at
+<https://restore-drill-attestor.sociobot.in>. Registry and binary publishing are
+performed by the factory; this repository does not contain credentials.
+
+## Security and privacy
+
+Keep the target disposable and isolated at the network and credential layers.
+This tool verifies recovery mechanics; it does not store backups, provide
+ransomware protection, or prove the semantic correctness of every row. Review
+the generated attestation before sharing it. Report vulnerabilities privately
+to `security@sociobot.in`.
+
+## License
+
+[MIT](LICENSE). See [CHANGELOG.md](CHANGELOG.md) for release history.

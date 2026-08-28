@@ -1,0 +1,38 @@
+[package]
+name = "restore-drill-attestor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Prove that a database backup restores, checks cleanly, and is destroyed"
+license = "MIT"
+repository = "https://github.com/B-Divyesh/sf-restore-drill-attestor"
+readme = "README.md"
+keywords = ["backup", "restore", "database", "attestation", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+include = [
+  "/src/**",
+  "/Cargo.toml",
+  "/Cargo.lock",
+  "/README.md",
+  "/LICENSE",
+  "/CHANGELOG.md",
+  "/examples/**"
+]
+
+[[bin]]
+name = "restore-drill"
+path = "src/main.rs"
+
+[dependencies]
+chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
+clap = { version = "4.5.47", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.143"
+sha2 = "0.10.9"
+toml = "0.9.5"
+
+[dev-dependencies]
+tempfile = "3.21.0"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.175"

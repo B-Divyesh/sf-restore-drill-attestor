@@ -1,0 +1,9 @@
+{
+  "slug": "restore-drill-attestor",
+  "title": "Restore Drill Attestor",
+  "artifact_class": "cli",
+  "user": "Indie SaaS operators and small platform teams who need repeatable proof that a database backup can restore into an isolated target and pass application-specific sanity checks.",
+  "smallest_useful_product": "A CLI that invokes an existing restore command into a disposable container/database, runs declarative row-count/schema/application checks, destroys the target, and writes a timestamped attestation with durations and no data values.",
+  "constraints": "Require isolated non-production targets and explicit destructive-target confirmation; never copy production data to a shared service; use encrypted local temporary storage only when unavoidable.",
+  "monetization": "one-time"
+}
