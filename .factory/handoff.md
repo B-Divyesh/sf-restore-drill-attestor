@@ -83,12 +83,18 @@ remains HTTP 404.
 
 ## Deployment and next step
 
-No static deploy was performed: the live deployment already matches the exact
-new local production build, and deploying an unchanged site cannot resolve the
-factory billing prerequisite. Once the factory registers and enables
-`restore-drill-attestor` at the Sociobot billing API with the documented $39
-one-time Operator Pack, restore the compliant checkout link and price/merchant
-copy, run a successful checkout-return-license verification, then deploy with:
+The authorized static deployment completed successfully as
+`1f5b95f5-1b0c-4206-8bf5-1f16aa458cc0`. The existing Static Web App in
+`centralus` was reused, the custom domain returned HTTPS 200, and the post-
+deploy verifier again found the direct demo's correct title, `lang`, one `h1`,
+one `main`, zero missing image alt attributes, and zero console/page errors.
+All 16 public artifacts matched the local production build after deployment.
+
+The static deploy cannot resolve the factory billing prerequisite. Once the
+factory registers and enables `restore-drill-attestor` at the Sociobot billing
+API with the documented $39 one-time Operator Pack, restore the compliant
+checkout link and price/merchant copy, run a successful checkout-return-license
+verification, then deploy with:
 
 ```sh
 /opt/fleet/lib/deploy-static.sh restore-drill-attestor /work/repo/dist/site
