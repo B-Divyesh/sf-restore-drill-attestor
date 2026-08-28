@@ -21,4 +21,5 @@ any browser storage uses only the `demo:` prefix. **Reset demo** clears that
 namespace and reruns the passing sample. **Start for real** clears the demo
 namespace and returns to the normal product page. The preview replays the same
 four lifecycle stages and evidence shape as the bundled CLI demo; it does not
-connect to a database.
+connect to a database. Any same-tab link that leaves demo mode also discards
+the `demo:` namespace before navigation.

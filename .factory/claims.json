@@ -4,7 +4,7 @@
     "claim": "The bundled demo restores sample data, runs three checks, removes its disposable target, and writes evidence in a temporary sandbox.",
     "where": "landing demo, CLI help, README",
     "test": "npx playwright test --project=chromium --grep '@claim:demo-sandbox'",
-    "sandbox": "fresh consumer directory; run restore-drill demo --json; assert passed evidence, removed target, temporary paths, and untouched sentinel"
+    "sandbox": "fresh consumer directory; run restore-drill demo --json; assert restore passed, exactly three checks ran, target removed, evidence retained under a temporary path, and sentinel untouched"
   },
   {
     "id": "evidence-minimization",
@@ -15,10 +15,45 @@
   },
   {
     "id": "target-safety",
-    "claim": "Production-looking targets are refused before any configured command starts.",
+    "claim": "Production-looking targets and an inexact target confirmation are refused before any configured command starts.",
     "where": "landing safety section, README",
     "test": "npx playwright test --project=chromium --grep '@claim:target-safety'",
-    "sandbox": "fresh temp directory; configure a production01 target whose restore would create a marker; assert exit 2 and no marker"
+    "sandbox": "fresh temp directory; separately configure a production01 target and an inexact confirmation whose restore would create a marker; assert exit 2 and no marker"
+  },
+  {
+    "id": "cleanup-recovery",
+    "claim": "After prepare starts, cleanup is attempted after restore failure, check failure, timeout, or interruption; interruption stops the active command tree, retains the target lock through cleanup and evidence, and records failure evidence.",
+    "where": "CLI help, README usage",
+    "test": "npx playwright test --project=chromium --grep '@claim:cleanup-recovery'",
+    "sandbox": "fresh temp targets; assert cleanup and failure evidence for restore and check failures, then send SIGTERM during a sleeping restore and assert child termination, held lock, target removal, interrupted evidence, and exit 3"
+  },
+  {
+    "id": "automation-contract",
+    "claim": "The CLI returns exit codes 0, 2, 3, and 4 for pass, configuration refusal, drill failure, and cleanup failure, with machine-readable JSON summaries in --json mode.",
+    "where": "README usage, CLI --help",
+    "test": "npx playwright test --project=chromium --grep '@claim:automation-contract'",
+    "sandbox": "fresh demo and three temporary configs; assert each exit code and parse the documented JSON stream"
+  },
+  {
+    "id": "target-lock",
+    "claim": "A local OS-backed per-target lock refuses a concurrent run before its configured commands start.",
+    "where": "README usage",
+    "test": "npx playwright test --project=chromium --grep '@claim:target-lock'",
+    "sandbox": "start one sleeping drill, attempt a second for the same target, and assert exit 2, no second command execution, one cleanup, and one attestation"
+  },
+  {
+    "id": "attestation-metadata",
+    "claim": "Evidence includes stage durations, a SHA-256 configuration fingerprint, and 30-day freshness by default; command and check timeouts default to 900 seconds.",
+    "where": "README usage and configuration API",
+    "test": "npx playwright test --project=chromium --grep '@claim:attestation-metadata'",
+    "sandbox": "fresh default-only config; assert effective validation defaults, exact SHA-256, duration fields, and fresh_until exactly 30 days after completion"
+  },
+  {
+    "id": "shell-environment",
+    "claim": "Configured commands run through the platform shell with inherited environment variables.",
+    "where": "README configuration API",
+    "test": "npx playwright test --project=chromium --grep '@claim:shell-environment'",
+    "sandbox": "fresh config whose restore and check require a process environment variable; assert the drill passes only with the inherited value"
   },
   {
     "id": "offline-reload",
@@ -39,6 +74,6 @@
     "claim": "The $39 one-time Operator Pack can be restored with a valid Sociobot license without gating the free CLI.",
     "where": "landing pricing section, terms page, README",
     "test": "npx playwright test --project=chromium --grep '@claim:operator-pack'",
-    "sandbox": "fresh browser context with a deterministic valid Sociobot verification response; assert price, purchase terms, and visible pack content"
+    "sandbox": "fresh browser context with a deterministic valid Sociobot verification response; assert price, purchase terms, every named pack item, and that the free sample runner stays enabled"
   }
 ]

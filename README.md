@@ -2,8 +2,8 @@
 
 Vendor-neutral proof that a database backup really restores. `restore-drill`
 runs your existing restore tooling against an explicitly isolated target, checks
-the result, always cleans up, and writes a compact JSON attestation containing
-durations and outcomes—never query results or command output.
+the result, and writes compact JSON evidence. After prepare starts, cleanup is
+attempted for passed, failed, timed-out, and interrupted drills.
 
 It is for indie SaaS operators and small platform teams who need recovery
 evidence without sending backups or production data to another service.
@@ -86,7 +86,9 @@ are `0` for a passed drill, `2` for configuration/safety errors, `3` for a
 restore or check failure, and `4` when cleanup fails. Cleanup is attempted after
 prepare, even when restore or checks fail. A local OS-backed lock serializes
 runs for the same `target.id`; a concurrent run refuses before any command is
-started. The attestation deliberately excludes commands, stdout, stderr, every
+started. `SIGINT` and `SIGTERM` stop the active command tree, keep that lock
+through cleanup and evidence writing, and return `3` with interrupted evidence.
+The attestation deliberately excludes commands, stdout, stderr, every
 user-supplied label (including drill, target, and check names), row counts,
 schema values, and secrets. Use its configuration fingerprint to correlate it
 with a local drill file.

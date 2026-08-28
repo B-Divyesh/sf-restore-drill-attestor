@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -9,8 +10,23 @@ import { promisify } from 'node:util';
 const exec = promisify(execFile);
 const repo = resolve(import.meta.dirname, '../..');
 
-async function runCli(args: string[], cwd = repo) {
-  return exec('cargo', ['run', '--quiet', '--manifest-path', join(repo, 'Cargo.toml'), '--', ...args], { cwd, timeout: 60_000 });
+async function runCli(args: string[], cwd = repo, environment: Record<string, string> = {}) {
+  return exec('cargo', ['run', '--quiet', '--manifest-path', join(repo, 'Cargo.toml'), '--', ...args], {
+    cwd,
+    timeout: 60_000,
+    env: { ...process.env, ...environment }
+  });
+}
+
+type CliFailure = Error & { code: number; stdout: string; stderr: string };
+
+async function failedCli(args: string[], cwd = repo): Promise<CliFailure> {
+  try {
+    await runCli(args, cwd);
+  } catch (error) {
+    return error as CliFailure;
+  }
+  throw new Error('CLI unexpectedly exited successfully');
 }
 
 test('@claim:demo-sandbox bundled CLI demo restores, checks, cleans up, and prints evidence', async () => {
@@ -23,7 +39,10 @@ test('@claim:demo-sandbox bundled CLI demo restores, checks, cleans up, and prin
     const result = JSON.parse(stdout) as Record<string, unknown>;
     expect(result).toMatchObject({ demo: true, status: 'passed', target_removed: true, real_data_touched: false });
     expect(String(result.path)).toContain(String(result.sandbox));
-    expect(await readFile(String(result.path), 'utf8')).toContain('"status": "passed"');
+    const evidence = JSON.parse(await readFile(String(result.path), 'utf8')) as { status: string; stages: Array<{ stage: string; status: string }>; checks: unknown[] };
+    expect(evidence.status).toBe('passed');
+    expect(evidence.stages.find(stage => stage.stage === 'restore')?.status).toBe('passed');
+    expect(evidence.checks).toHaveLength(3);
     expect(await readFile(sentinel, 'utf8')).toBe('untouched');
     await rm(String(result.sandbox), { recursive: true });
   } finally {
@@ -53,6 +72,115 @@ test('@claim:target-safety production-looking targets are refused before command
     await writeFile(config, `version = 1\n[drill]\nname = "unsafe"\n[target]\nid = "production01"\nisolated = true\n[commands]\nrestore = "touch ${marker}"\ncleanup = "true"\n[[checks]]\nname = "smoke"\nkind = "command"\ncommand = "true"\n`);
     await expect(runCli(['run', '--config', config, '--confirm', 'production01'], consumer)).rejects.toMatchObject({ code: 2 });
     await expect(readFile(marker)).rejects.toThrow();
+
+    const safeConfig = join(consumer, 'safe.toml');
+    await writeFile(safeConfig, `version = 1\n[drill]\nname = "safe"\n[target]\nid = "isolated-claim-target"\nisolated = true\n[commands]\nrestore = "touch ${marker}"\ncleanup = "true"\n[[checks]]\nname = "smoke"\nkind = "command"\ncommand = "true"\n`);
+    await expect(runCli(['run', '--config', safeConfig, '--confirm', 'wrong-target'], consumer)).rejects.toMatchObject({ code: 2 });
+    await expect(readFile(marker)).rejects.toThrow();
+  } finally {
+    await rm(consumer, { recursive: true, force: true });
+  }
+});
+
+test('@claim:cleanup-recovery failures and interruption retain the lock, stop children, clean up, and write evidence', async () => {
+  const consumer = await mkdtemp(join(tmpdir(), 'rda-claim-cleanup-'));
+  try {
+    for (const [name, restore, check] of [['restore', 'false', 'true'], ['check', 'true', 'false']]) {
+      const target = join(consumer, `${name}-target`);
+      const cleaned = join(consumer, `${name}-cleaned`);
+      const output = join(consumer, `${name}-evidence`);
+      const config = join(consumer, `${name}.toml`);
+      await writeFile(config, `version = 1\n[drill]\nname = "${name} failure"\n[target]\nid = "${name}-failure-target"\nisolated = true\n[commands]\nprepare = "mkdir -p ${target}"\nrestore = "${restore}"\ncleanup = "rm -rf ${target}; touch ${cleaned}"\n[[checks]]\nname = "smoke"\nkind = "command"\ncommand = "${check}"\n`);
+      const failure = await failedCli(['run', '--json', '--config', config, '--confirm', `${name}-failure-target`, '--output', output], consumer);
+      expect(failure.code).toBe(3);
+      expect(JSON.parse(failure.stdout)).toMatchObject({ status: 'failed', interrupted: false });
+      expect(await readFile(cleaned, 'utf8')).toBe('');
+      await expect(readFile(target)).rejects.toThrow();
+    }
+
+    const timeoutTarget = join(consumer, 'timeout-target');
+    const timeoutCleaned = join(consumer, 'timeout-cleaned');
+    const timeoutOutput = join(consumer, 'timeout-evidence');
+    const timeoutConfig = join(consumer, 'timeout.toml');
+    await writeFile(timeoutConfig, `version = 1\n[drill]\nname = "timeout failure"\n[target]\nid = "timeout-failure-target"\nisolated = true\n[commands]\nprepare = "mkdir -p ${timeoutTarget}"\nrestore = "true"\ncleanup = "rm -rf ${timeoutTarget}; touch ${timeoutCleaned}"\n[[checks]]\nname = "slow check"\nkind = "command"\ncommand = "sleep 2"\ntimeout_seconds = 1\n`);
+    const timeoutFailure = await failedCli(['run', '--json', '--config', timeoutConfig, '--confirm', 'timeout-failure-target', '--output', timeoutOutput], consumer);
+    expect(timeoutFailure.code).toBe(3);
+    const timeoutSummary = JSON.parse(timeoutFailure.stdout);
+    const timeoutEvidence = JSON.parse(await readFile(timeoutSummary.path, 'utf8'));
+    expect(timeoutEvidence.checks[0].status).toBe('failed');
+    expect(timeoutEvidence.stages.at(-1)).toMatchObject({ stage: 'cleanup', status: 'passed' });
+    expect(await readFile(timeoutCleaned, 'utf8')).toBe('');
+    await expect(readFile(timeoutTarget)).rejects.toThrow();
+
+    const { stdout } = await exec('cargo', [
+      'test', '--quiet', '--manifest-path', join(repo, 'Cargo.toml'), '--test', 'cli_json',
+      'interrupted_run_kills_command_tree_keeps_lock_cleans_up_and_writes_evidence', '--', '--exact'
+    ], { cwd: repo, timeout: 60_000 });
+    expect(stdout).toContain('1 passed');
+  } finally {
+    await rm(consumer, { recursive: true, force: true });
+  }
+});
+
+test('@claim:automation-contract exit codes and JSON output are stable for automation', async () => {
+  const consumer = await mkdtemp(join(tmpdir(), 'rda-claim-automation-'));
+  try {
+    const demo = JSON.parse((await runCli(['demo', '--json'], consumer)).stdout);
+    expect(demo.status).toBe('passed');
+
+    const cases = [
+      { id: 'config', target: 'production01', restore: 'true', cleanup: 'true', check: 'true', code: 2, stream: 'stderr', status: undefined },
+      { id: 'drill', target: 'drill-failure-target', restore: 'false', cleanup: 'true', check: 'true', code: 3, stream: 'stdout', status: 'failed' },
+      { id: 'cleanup', target: 'cleanup-failure-target', restore: 'true', cleanup: 'false', check: 'true', code: 4, stream: 'stdout', status: 'cleanup_failed' }
+    ] as const;
+    for (const item of cases) {
+      const config = join(consumer, `${item.id}.toml`);
+      await writeFile(config, `version = 1\n[drill]\nname = "${item.id}"\n[target]\nid = "${item.target}"\nisolated = true\n[commands]\nrestore = "${item.restore}"\ncleanup = "${item.cleanup}"\n[[checks]]\nname = "smoke"\nkind = "command"\ncommand = "${item.check}"\n`);
+      const failure = await failedCli(['run', '--json', '--config', config, '--confirm', item.target, '--output', join(consumer, `${item.id}-out`)], consumer);
+      expect(failure.code).toBe(item.code);
+      const summary = JSON.parse(item.stream === 'stdout' ? failure.stdout : failure.stderr);
+      if (item.status) expect(summary.status).toBe(item.status);
+      else expect(summary).toMatchObject({ ok: false, exit_code: 2, error: { kind: 'configuration' } });
+    }
+  } finally {
+    await rm(consumer, { recursive: true, force: true });
+  }
+});
+
+test('@claim:target-lock a concurrent run for one target is refused before its commands start', async () => {
+  const { stdout } = await exec('cargo', [
+    'test', '--quiet', '--manifest-path', join(repo, 'Cargo.toml'), '--test', 'cli_json',
+    'concurrent_runs_for_one_target_refuse_before_second_commands_start', '--', '--exact'
+  ], { cwd: repo, timeout: 60_000 });
+  expect(stdout).toContain('1 passed');
+});
+
+test('@claim:attestation-metadata defaults, fingerprint, freshness, and durations are recorded', async () => {
+  const consumer = await mkdtemp(join(tmpdir(), 'rda-claim-metadata-'));
+  try {
+    const config = join(consumer, 'defaults.toml');
+    const source = `version = 1\n[drill]\nname = "metadata"\n[target]\nid = "metadata-claim-target"\nisolated = true\n[commands]\nrestore = "true"\ncleanup = "true"\n[[checks]]\nname = "smoke"\nkind = "command"\ncommand = "true"\n`;
+    await writeFile(config, source);
+    const validation = JSON.parse((await runCli(['validate', '--json', '--config', config], consumer)).stdout);
+    expect(validation.effective_defaults).toEqual({ command_timeout_seconds: 900, check_timeout_seconds: [900], attestation_ttl_days: 30 });
+    const summary = JSON.parse((await runCli(['run', '--json', '--config', config, '--confirm', 'metadata-claim-target', '--output', join(consumer, 'evidence')], consumer)).stdout);
+    const evidence = JSON.parse(await readFile(summary.path, 'utf8'));
+    expect(evidence.config_sha256).toBe(createHash('sha256').update(source).digest('hex'));
+    expect(evidence.duration_ms).toBeGreaterThanOrEqual(0);
+    expect(evidence.stages.every((stage: { duration_ms: number }) => Number.isInteger(stage.duration_ms))).toBe(true);
+    expect(Date.parse(evidence.fresh_until) - Date.parse(evidence.completed_at)).toBe(30 * 24 * 60 * 60 * 1000);
+  } finally {
+    await rm(consumer, { recursive: true, force: true });
+  }
+});
+
+test('@claim:shell-environment commands run through the platform shell with inherited environment variables', async () => {
+  const consumer = await mkdtemp(join(tmpdir(), 'rda-claim-env-'));
+  try {
+    const config = join(consumer, 'environment.toml');
+    await writeFile(config, `version = 1\n[drill]\nname = "environment"\n[target]\nid = "environment-claim-target"\nisolated = true\n[commands]\nrestore = 'test "$RDA_CLAIM_ENV" = inherited-value'\ncleanup = "true"\n[[checks]]\nname = "shell"\nkind = "command"\ncommand = 'test "$RDA_CLAIM_ENV" = inherited-value'\n`);
+    const result = JSON.parse((await runCli(['run', '--json', '--config', config, '--confirm', 'environment-claim-target', '--output', join(consumer, 'evidence')], consumer, { RDA_CLAIM_ENV: 'inherited-value' })).stdout);
+    expect(result.status).toBe('passed');
   } finally {
     await rm(consumer, { recursive: true, force: true });
   }
@@ -234,6 +362,10 @@ test('@claim:operator-pack the page states the one-time price and verifies a res
   await expect(page.locator('.price-ticket')).toContainText('one-time purchase');
   await expect(page.locator('[data-operator-content]')).toBeVisible();
   await expect(page.locator('[data-license-status]')).toContainText('License active');
+  await expect(page.locator('.pricing-section')).toContainText('GitHub Actions and cron scheduling recipes');
+  await expect(page.locator('[data-operator-content]')).toContainText('Monthly review agenda');
+  await expect(page.locator('.pricing-section')).toContainText('multi-database evidence policy template');
+  await expect(page.getByRole('button', { name: 'Run sample drill' })).toBeEnabled();
 });
 
 test('first-screen sample action enters an isolated, resettable demo namespace', async ({ page }) => {
@@ -255,6 +387,23 @@ test('first-screen sample action enters an isolated, resettable demo namespace',
   await page.getByRole('link', { name: 'Start for real' }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.locator('[data-demo-banner]')).toBeHidden();
+});
+
+test('every same-tab exit from demo discards demo-prefixed storage', async ({ page }) => {
+  await page.route('https://api.sociobot.in/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ valid: true, reason: 'ok', expires_at: null })
+  }));
+  await page.goto('/?demo=1#operator-pack');
+  await page.getByRole('button', { name: 'Have a license? Paste it' }).click();
+  await page.getByLabel('License token').fill('demo-only-token');
+  await page.getByRole('button', { name: 'Verify', exact: true }).click();
+  await expect(page.locator('[data-license-status]')).toContainText('License active');
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('demo:')))).toHaveLength(2);
+  await page.getByRole('link', { name: 'Restore Drill Attestor home' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('demo:')))).toEqual([]);
 });
 
 test('an invalid license relocks paid content without blocking the free product', async ({ page }) => {

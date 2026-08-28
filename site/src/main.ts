@@ -142,6 +142,17 @@ select<HTMLButtonElement>('[data-reset-demo]')?.addEventListener('click', () => 
 });
 select<HTMLAnchorElement>('[data-start-real]')?.addEventListener('click', clearDemoStorage);
 
+if (demoMode) {
+  document.addEventListener('click', event => {
+    const link = (event.target as Element | null)?.closest<HTMLAnchorElement>('a[href]');
+    if (!link || link.target === '_blank') return;
+    const destination = new URL(link.href, location.href);
+    if (destination.origin !== location.origin || new URLSearchParams(destination.search).get('demo') !== '1') {
+      clearDemoStorage();
+    }
+  });
+}
+
 const licenseForm = select<HTMLFormElement>('[data-license-form]');
 const licenseStatus = select<HTMLElement>('[data-license-status]');
 const operatorContent = select<HTMLElement>('[data-operator-content]');
