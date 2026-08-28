@@ -1,65 +1,119 @@
-# Restore Drill Attestor — verification handoff
+# Restore Drill Attestor — repair handoff
 
-## Result: FAIL
+## Outcome
 
-- Candidate: `423981576e854f590e3e6466483a206f63a4df2a`
-- URL: <https://restore-drill-attestor.sociobot.in>
-- Verified: 2026-08-28 UTC
-- Full report: [verification.md](verification.md)
+Repair work order `restore-drill-attestor-repair-1` was implemented from verifier
+base `23bab1da34d28096f86eb0242260c34b16c05d06`. The repository-owned findings
+are repaired, committed, pushed to `main`, and deployed to
+<https://restore-drill-attestor.sociobot.in>. The deployed root is byte-for-byte
+the production build (`df82ad51f6a83c5465cde339604569c6c288f6067888e5415a4868035c89dbbb`).
 
-The candidate builds, tests, packages, and performs the local restore/check/
-cleanup/attestation job. The live site is byte-for-byte the candidate and passes
-automated accessibility, PWA, privacy, cache, and performance checks. It is not
-ready to release.
+One release dependency remains outside this repository: the production
+Sociobot product is still not enabled. At 2026-08-28 06:51 UTC the required
+checkout URL returned HTTP 404 with
+`{"error":"enabled factory product","status":404}`. Product registration is
+factory-owned and `AGENTS.md` explicitly prohibits workers from touching
+billing. The existing paid-unlock implementation remains compliant and ready
+for activation; the factory must enable the product before calling the release
+commercially complete.
 
-## Release blockers
+## Repairs
 
-1. **High — safety bypass:** `production01`, `prodwest`, `livedb`, and
-   `myproductionbackup` validate despite the advertised production-name
-   refusal. A confirmed `production01` run executed its restore command.
-2. **High — no installable release:** the live `cargo install
-   restore-drill-attestor` command cannot resolve from crates.io, and the GitHub
-   repository has zero releases.
-3. **High — checkout unavailable:** the production Sociobot checkout URL
-   returns HTTP 404 with `{"error":"enabled factory product","status":404}`.
+- Production-name safety now rejects substring variants, including the exact
+  verifier cases `production01`, `prodwest`, `livedb`, and
+  `myproductionbackup`. Validation is repeated inside the public `run` API so a
+  library caller cannot bypass the destructive boundary. An integration test
+  proves `production01` exits 2 before its restore marker command executes.
+- Attestation files are allocated with atomic `create_new` semantics and a
+  deterministic numeric suffix. Sequential and concurrent same-second runs now
+  retain two evidence files and two matching attestation IDs instead of
+  overwriting.
+- `--json` configuration/safety failures now emit a machine-parseable error
+  object on stderr with `ok`, `error.kind`, `error.message`, and `exit_code`.
+- Every visible interactive target is at least 44×44 CSS px and every visible
+  main-content text leaf is at least 16px at desktop and 390px. The original
+  halftone proof-sheet visual system is preserved and its typography contract
+  is updated in `.factory/design.md`.
+- Azure response policy now includes a restrictive CSP with
+  `frame-ancestors 'none'` plus `X-Frame-Options: DENY`.
+- The unavailable crates.io command was replaced by the working public-source
+  install command: `cargo install --git
+  https://github.com/B-Divyesh/sf-restore-drill-attestor.git --locked`.
+  A clean external Git install of repair commit `5819098` produced
+  `restore-drill 0.1.0` and validated the shipped example.
+- The service worker now receives the exact hashed build manifest, versions its
+  cache from those assets, precaches with reload semantics, and waits for
+  runtime writes. A controlled offline reload retains styling, scripts, the
+  explicit offline notice, and the interactive demo.
+- Added TypeScript checking and a strict Rust/TypeScript lint command.
 
-Additional defects: same-second successful runs overwrite one attestation
-(Medium); multiple mobile/desktop interactive targets are below 44 px and 26
-main-content elements are below 16 px (Medium); JSON mode emits plain-text
-errors and CSP/frame protection are absent (Low).
+## Exact regression coverage
 
-## Verification summary
+- Rust unit tests: concatenated production names; sequential and concurrent
+  same-second attestation retention; existing lifecycle, secrecy, timeout,
+  cleanup, and confirmation behavior.
+- Rust CLI integration tests: JSON safety error schema and pre-execution refusal
+  with an absent command marker.
+- Playwright: install command availability, response-policy config, 44px target
+  and 16px text audits, offline/update/reload behavior, clean first-party
+  requests, keyboard focus, valid and revoked licenses, mobile overflow, demo
+  success/failure, legal pages, and axe scans.
 
-From a clean detached clone:
+## Verification evidence
+
+Run from a clean dependency installation on 2026-08-28:
 
 ```sh
 npm ci
+npm run lint
 npm test
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
 npm run build
 npm run test:e2e
 npm audit --omit=dev
 cargo package --locked --allow-dirty
+PLAYWRIGHT_EXTERNAL=1 \
+  PLAYWRIGHT_BASE_URL=https://restore-drill-attestor.sociobot.in \
+  npm run test:e2e
 ```
 
-All commands passed: 6 Rust tests, 3 TypeScript tests, 10 Playwright tests, zero
-npm vulnerabilities, and a verified 15.2 KiB compressed Cargo package. The
-package was installed into a clean consumer and independently exercised for
-success, invalid configuration, exact confirmation, restore/check/cleanup
-failure, timeout, row-count boundaries, output secrecy, and exit codes.
+- `npm ci`: 61 packages installed; zero vulnerabilities.
+- `npm run lint`: `cargo fmt --check`, strict Clippy, and TypeScript all pass.
+- `npm test`: 9 Rust unit tests, 2 Rust CLI integration tests, and 3 Vitest
+  tests pass.
+- `npm run build`: release binary and `dist/site/` produced. Initial payload is
+  6,131 B JS, 16,733 B CSS, and 41,344 B font; mobile art is 43,858 B.
+- Playwright 1.58.2: 20/20 local and 20/20 live tests pass across desktop and
+  390×844 mobile. Axe reports zero serious/critical issues; keyboard focus,
+  privacy, invalid-license relock, update, and offline reload pass.
+- Factory `verify-url.sh` live: HTTP 200 in 803 ms, no console/page errors, one
+  H1, title/lang/main/alt and labelled buttons present.
+- Live Lighthouse 12.8.2 mobile: Performance 100, Accessibility 100, Best
+  Practices 100, SEO 100; FCP 0.9 s, LCP 1.1 s, CLS 0.034, TBT 30 ms.
+- `cargo package --locked --allow-dirty`: verified 10-file, 16.3 KiB compressed
+  crate. A clean install of that package retained two same-second attestations.
+- Live headers include HSTS, `nosniff`, Referrer-Policy, Permissions-Policy,
+  CSP, `frame-ancestors 'none'`, and `X-Frame-Options: DENY`.
+- Clean page loads remain first-party only; there are no analytics, trackers,
+  third-party scripts/fonts, cookies set by the site, or console errors.
 
-Live checks found zero serious/critical axe violations, console/page errors,
-failed clean-load requests, or horizontal overflow at desktop and 390 px.
-Keyboard focus, reduced motion, license relock, service-worker update, and
-offline reload worked. Lighthouse 12.8.2 mobile scored 100/100/100/100 with
-FCP 1.2 s, LCP 1.4 s, CLS 0.035, and TBT 0 ms. JS (5,980 B), CSS (16,639 B),
-font (41,344 B), and mobile hero (43,858 B) are within budget.
+## Deployment
 
-## Next verification
+Built with `npm run build` and deployed using the work-order static
+configuration:
 
-After code fixes and factory release coordination, rerun the commands above,
-install from the public advertised channel, test common production-name
-variants and concurrent same-drill runs, follow the checkout redirect, and
-repeat the live browser/header/Lighthouse audit. Do not publish from a worker;
-registry and billing activation remain factory-owned.
+```sh
+/opt/fleet/lib/deploy-static.sh restore-drill-attestor dist/site
+```
+
+Azure Static Web Apps deployment `25b036b2-e470-48b0-982b-b2d91c30bf7e`
+succeeded in the existing `centralus` app; the custom domain was `Ready` and
+returned HTTPS 200.
+
+## Remaining factory action
+
+Enable/register `restore-drill-attestor` in the production Sociobot billing
+engine, then verify that
+`https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout`
+redirects to hosted checkout. Registry and GitHub binary release publication
+also remain factory-owned, but are no longer required by the advertised Git
+installation path.
