@@ -6,6 +6,10 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- Handle `SIGINT` and `SIGTERM` by terminating the active command tree, retaining the target lock, running cleanup, and writing interrupted failure evidence.
+- Give the Windows bundled demo the same row-count, schema, and application checks as Unix.
+- Discard demo-prefixed license state through every same-tab demo exit, including the wordmark.
+- Expand the claims manifest and exact sandbox coverage to include recovery cleanup, automation exit codes, target locking, attestation defaults, and inherited shell environment behavior.
 - Add the required one-command temporary demo, bundled sample data, and exact CLI regression coverage.
 - Add a one-click browser demo with isolated `demo:` storage, reset, and exit controls.
 - Add a claim manifest with one tagged observable test for every public product claim.

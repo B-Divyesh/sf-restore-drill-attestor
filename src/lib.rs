@@ -7,10 +7,15 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 900;
+
+static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+static INTERRUPT_HANDLER: OnceLock<Result<(), String>> = OnceLock::new();
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -80,6 +85,7 @@ pub struct Attestation {
     pub fresh_until: String,
     pub duration_ms: u128,
     pub status: Status,
+    pub interrupted: bool,
     pub stages: Vec<StageEvidence>,
     pub checks: Vec<CheckEvidence>,
     pub privacy: &'static str,
@@ -273,6 +279,8 @@ pub fn run(
         )));
     }
 
+    install_interrupt_handler()?;
+
     // Hold this before the first command and until evidence is durable. This is
     // deliberately keyed only by the target, not the output directory: two
     // schedulers may choose different evidence locations while still pointing
@@ -288,7 +296,7 @@ pub fn run(
 
     if let Some(prepare) = &config.commands.prepare {
         should_cleanup = true;
-        let result = run_command(prepare, config.commands.timeout_seconds)?;
+        let result = run_command(prepare, config.commands.timeout_seconds, true)?;
         stages.push(stage("prepare", &result));
         if !result.success {
             failed = true;
@@ -297,7 +305,11 @@ pub fn run(
 
     if !failed {
         should_cleanup = true;
-        let result = run_command(&config.commands.restore, config.commands.timeout_seconds)?;
+        let result = run_command(
+            &config.commands.restore,
+            config.commands.timeout_seconds,
+            true,
+        )?;
         stages.push(stage("restore", &result));
         if !result.success {
             failed = true;
@@ -306,7 +318,7 @@ pub fn run(
 
     if !failed {
         for (index, check) in config.checks.iter().enumerate() {
-            let result = run_command(&check.command, check.timeout_seconds)?;
+            let result = run_command(&check.command, check.timeout_seconds, true)?;
             let passed = check_passed(check, &result);
             checks.push(CheckEvidence {
                 check_id: format!("check-{}", index + 1),
@@ -321,15 +333,22 @@ pub fn run(
     }
 
     let cleanup_result = if should_cleanup {
-        run_command(&config.commands.cleanup, config.commands.timeout_seconds)?
+        // An interrupt has already been consumed by the active stage. Keep the
+        // target lock and allow cleanup to finish before evidence is written.
+        run_command(
+            &config.commands.cleanup,
+            config.commands.timeout_seconds,
+            false,
+        )?
     } else {
         CommandResult::skipped()
     };
     stages.push(stage("cleanup", &cleanup_result));
 
+    let interrupted = INTERRUPTED.load(Ordering::SeqCst);
     let status = if !cleanup_result.success {
         Status::CleanupFailed
-    } else if failed {
+    } else if failed || interrupted {
         Status::Failed
     } else {
         Status::Passed
@@ -354,12 +373,24 @@ pub fn run(
         fresh_until: timestamp_string(fresh_until),
         duration_ms: run_timer.elapsed().as_millis(),
         status,
+        interrupted,
         stages,
         checks,
         privacy: "No commands, stdout, stderr, query results, schema values, check labels, or secrets recorded.",
     };
     let path = write_attestation(output_dir, &mut attestation)?;
     Ok(RunResult { attestation, path })
+}
+
+fn install_interrupt_handler() -> Result<(), Error> {
+    let result = INTERRUPT_HANDLER.get_or_init(|| {
+        ctrlc::set_handler(|| INTERRUPTED.store(true, Ordering::SeqCst))
+            .map_err(|error| error.to_string())
+    });
+    result
+        .as_ref()
+        .map_err(|error| Error::Io(format!("could not install interrupt handler: {error}")))
+        .copied()
 }
 
 /// A process-scoped advisory lock for a declared restore target.
@@ -478,6 +509,7 @@ struct CommandResult {
     stdout: Vec<u8>,
     duration_ms: u128,
     timed_out: bool,
+    interrupted: bool,
 }
 
 impl CommandResult {
@@ -487,11 +519,16 @@ impl CommandResult {
             stdout: Vec::new(),
             duration_ms: 0,
             timed_out: false,
+            interrupted: false,
         }
     }
 }
 
-fn run_command(command: &str, timeout_seconds: u64) -> Result<CommandResult, Error> {
+fn run_command(
+    command: &str,
+    timeout_seconds: u64,
+    observe_interrupt: bool,
+) -> Result<CommandResult, Error> {
     let started = Instant::now();
     let mut process = shell_command(command);
     let mut child = process
@@ -508,14 +545,19 @@ fn run_command(command: &str, timeout_seconds: u64) -> Result<CommandResult, Err
         Ok::<Vec<u8>, io::Error>(bytes)
     });
     let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
-    let (success, timed_out) = loop {
+    let (success, timed_out, interrupted) = loop {
         match child.try_wait() {
-            Ok(Some(status)) => break (status.success(), false),
+            Ok(Some(status)) => break (status.success(), false, false),
+            Ok(None) if observe_interrupt && INTERRUPTED.load(Ordering::SeqCst) => {
+                terminate_process(&mut child);
+                let _ = child.wait();
+                break (false, false, true);
+            }
             Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(25)),
             Ok(None) => {
                 terminate_process(&mut child);
                 let _ = child.wait();
-                break (false, true);
+                break (false, true, false);
             }
             Err(error) => {
                 terminate_process(&mut child);
@@ -534,6 +576,7 @@ fn run_command(command: &str, timeout_seconds: u64) -> Result<CommandResult, Err
         stdout,
         duration_ms: started.elapsed().as_millis(),
         timed_out,
+        interrupted,
     })
 }
 
@@ -563,13 +606,21 @@ fn terminate_process(child: &mut std::process::Child) {
 
 #[cfg(windows)]
 fn terminate_process(child: &mut std::process::Child) {
+    // `cmd.exe` can have a restore program beneath it. Terminate the full tree.
+    let _ = Command::new("taskkill")
+        .args(["/PID", &child.id().to_string(), "/T", "/F"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
     let _ = child.kill();
 }
 
 fn stage(name: &'static str, result: &CommandResult) -> StageEvidence {
     StageEvidence {
         stage: name,
-        status: if result.timed_out {
+        status: if result.interrupted {
+            "interrupted"
+        } else if result.timed_out {
             "timed_out"
         } else if result.success {
             "passed"
@@ -777,14 +828,14 @@ timeout_seconds = 2
 
     #[test]
     fn command_capture_does_not_deadlock_on_large_output() {
-        let result = run_command("dd if=/dev/zero bs=1024 count=256 2>/dev/null", 2).unwrap();
+        let result = run_command("dd if=/dev/zero bs=1024 count=256 2>/dev/null", 2, true).unwrap();
         assert!(result.success);
         assert_eq!(result.stdout.len(), 262_144);
     }
 
     #[test]
     fn command_timeout_is_recorded() {
-        let result = run_command("sleep 2", 1).unwrap();
+        let result = run_command("sleep 2", 1, true).unwrap();
         assert!(!result.success);
         assert!(result.timed_out);
         assert!(result.duration_ms < 1_800);

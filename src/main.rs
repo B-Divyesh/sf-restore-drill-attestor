@@ -101,7 +101,16 @@ fn execute(cli: Cli) -> Result<u8, Error> {
             if json {
                 println!(
                     "{}",
-                    json!({"valid": true, "drill": config.drill.name, "target_id": config.target.id})
+                    json!({
+                        "valid": true,
+                        "drill": config.drill.name,
+                        "target_id": config.target.id,
+                        "effective_defaults": {
+                            "command_timeout_seconds": config.commands.timeout_seconds,
+                            "check_timeout_seconds": config.checks.iter().map(|check| check.timeout_seconds).collect::<Vec<_>>(),
+                            "attestation_ttl_days": config.attestation_ttl_days
+                        }
+                    })
                 );
             } else {
                 println!(
@@ -126,7 +135,8 @@ fn execute(cli: Cli) -> Result<u8, Error> {
                         "status": result.attestation.status,
                         "attestation_id": result.attestation.attestation_id,
                         "path": result.path,
-                        "duration_ms": result.attestation.duration_ms
+                        "duration_ms": result.attestation.duration_ms,
+                        "interrupted": result.attestation.interrupted
                     })
                 );
             } else {
@@ -223,8 +233,12 @@ fn run_demo(json_output: bool) -> Result<u8, Error> {
 
 #[cfg(unix)]
 fn demo_config(target_id: &str, sample: &std::path::Path, target: &std::path::Path) -> String {
-    let sample = shell_quote(sample);
-    let target = shell_quote(target);
+    demo_config_unix(target_id, sample, target)
+}
+
+fn demo_config_unix(target_id: &str, sample: &std::path::Path, target: &std::path::Path) -> String {
+    let sample = shell_quote_unix(sample);
+    let target = shell_quote_unix(target);
     format!(
         r#"version = 1
 attestation_ttl_days = 30
@@ -268,8 +282,21 @@ timeout_seconds = 10
 
 #[cfg(windows)]
 fn demo_config(target_id: &str, sample: &std::path::Path, target: &std::path::Path) -> String {
-    let sample = shell_quote(sample);
-    let target = shell_quote(target);
+    demo_config_windows(target_id, sample, target)
+}
+
+#[cfg(any(windows, test))]
+fn demo_config_windows(
+    target_id: &str,
+    sample: &std::path::Path,
+    target: &std::path::Path,
+) -> String {
+    let sample = shell_quote_windows(sample);
+    let target_shell = shell_quote_windows(target);
+    let target_powershell = target
+        .to_string_lossy()
+        .replace('\\', "/")
+        .replace('\'', "''");
     format!(
         r#"version = 1
 attestation_ttl_days = 30
@@ -279,25 +306,73 @@ name = "bundled customer database sample"
 id = "{target_id}"
 isolated = true
 [commands]
-prepare = "mkdir {target}"
-restore = "copy {sample} {target}\\restored.tsv"
-cleanup = "rmdir /s /q {target}"
+prepare = "mkdir {target_shell}"
+restore = "copy {sample} {target_shell}/restored.tsv"
+cleanup = "rmdir /s /q {target_shell}"
 timeout_seconds = 10
 [[checks]]
-name = "sample restored"
+name = "three customer records restored"
+kind = "row_count"
+command = "powershell -NoProfile -Command \"(Get-Content -LiteralPath '{target_powershell}/restored.tsv').Count - 1\""
+min = 3
+max = 3
+timeout_seconds = 10
+[[checks]]
+name = "expected customer schema exists"
+kind = "schema"
+command = "powershell -NoProfile -Command \"Get-Content -LiteralPath '{target_powershell}/restored.tsv' -TotalCount 1\""
+contains = "account_id"
+timeout_seconds = 10
+[[checks]]
+name = "restored application record is readable"
 kind = "application"
-command = "findstr /c:acme-garden {target}\\restored.tsv"
+command = "findstr /c:acme-garden {target_shell}/restored.tsv"
 timeout_seconds = 10
 "#
     )
 }
 
-#[cfg(unix)]
-fn shell_quote(path: &std::path::Path) -> String {
+#[cfg(any(unix, test))]
+fn shell_quote_unix(path: &std::path::Path) -> String {
     format!("'{}'", path.to_string_lossy().replace('\'', "'\\''"))
 }
 
-#[cfg(windows)]
-fn shell_quote(path: &std::path::Path) -> String {
-    format!("\"{}\"", path.display())
+#[cfg(any(windows, test))]
+fn shell_quote_windows(path: &std::path::Path) -> String {
+    format!(
+        "\\\"{}\\\"",
+        path.to_string_lossy()
+            .replace('\\', "/")
+            .replace('"', "\"\"")
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn both_platform_demos_define_the_three_promised_checks() {
+        let sample = std::path::Path::new("C:/sample/bundled-backup.tsv");
+        let target = std::path::Path::new("C:/sample/disposable-target");
+        for source in [
+            demo_config_unix("sample-target", sample, target),
+            demo_config_windows("sample-target", sample, target),
+        ] {
+            let config: restore_drill_attestor::Config = toml::from_str(&source).unwrap();
+            assert_eq!(config.checks.len(), 3);
+            assert_eq!(
+                config.checks[0].kind,
+                restore_drill_attestor::CheckKind::RowCount
+            );
+            assert_eq!(
+                config.checks[1].kind,
+                restore_drill_attestor::CheckKind::Schema
+            );
+            assert_eq!(
+                config.checks[2].kind,
+                restore_drill_attestor::CheckKind::Application
+            );
+        }
+    }
 }
