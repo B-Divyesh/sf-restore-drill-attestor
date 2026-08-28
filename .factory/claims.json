@@ -1,0 +1,44 @@
+[
+  {
+    "id": "demo-sandbox",
+    "claim": "The bundled demo restores sample data, runs three checks, removes its disposable target, and writes evidence in a temporary sandbox.",
+    "where": "landing demo, CLI help, README",
+    "test": "npx playwright test --project=chromium --grep '@claim:demo-sandbox'",
+    "sandbox": "fresh consumer directory; run restore-drill demo --json; assert passed evidence, removed target, temporary paths, and untouched sentinel"
+  },
+  {
+    "id": "evidence-minimization",
+    "claim": "Attestations omit commands, output, restored values, and user-supplied labels.",
+    "where": "landing evidence section, privacy page, README",
+    "test": "npx playwright test --project=chromium --grep '@claim:evidence-minimization'",
+    "sandbox": "bundled demo; read emitted JSON and reject known sample values, labels, command text, and filenames"
+  },
+  {
+    "id": "target-safety",
+    "claim": "Production-looking targets are refused before any configured command starts.",
+    "where": "landing safety section, README",
+    "test": "npx playwright test --project=chromium --grep '@claim:target-safety'",
+    "sandbox": "fresh temp directory; configure a production01 target whose restore would create a marker; assert exit 2 and no marker"
+  },
+  {
+    "id": "offline-reload",
+    "claim": "The documentation and sample demo work offline after the first visit.",
+    "where": "landing first-screen facts, README",
+    "test": "npx playwright test --project=chromium --grep '@claim:offline-reload'",
+    "sandbox": "fresh browser context; install and update service worker; reload offline and complete the sample demo"
+  },
+  {
+    "id": "site-local-only",
+    "claim": "The public demo has no analytics, tracking, or third-party runtime requests.",
+    "where": "landing footer, privacy page, README",
+    "test": "npx playwright test --project=chromium --grep '@claim:site-local-only'",
+    "sandbox": "fresh browser context; record every request through the complete demo and assert only the current origin"
+  },
+  {
+    "id": "operator-pack",
+    "claim": "The $39 one-time Operator Pack can be restored with a valid Sociobot license without gating the free CLI.",
+    "where": "landing pricing section, terms page, README",
+    "test": "npx playwright test --project=chromium --grep '@claim:operator-pack'",
+    "sandbox": "fresh browser context with a deterministic valid Sociobot verification response; assert price, purchase terms, and visible pack content"
+  }
+]

@@ -6,6 +6,11 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- Add the required one-command temporary demo, bundled sample data, and exact CLI regression coverage.
+- Add a one-click browser demo with isolated `demo:` storage, reset, and exit controls.
+- Add a claim manifest with one tagged observable test for every public product claim.
+- Replace the first-screen metaphor with a direct audience, job, sample action, outcome, and three product facts.
+- Add social metadata, an Apple touch icon, sitemap, and a designed HTTP 404 response.
 - Replace all user-supplied labels with neutral evidence IDs so drill, target, and check names cannot leak into attestations or filenames.
 - Serialize local runs for the same declared target with an OS-backed lock and an early safe refusal.
 - Refuse concatenated production-like target IDs before any command starts.

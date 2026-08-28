@@ -1,7 +1,7 @@
 const BUILD_ASSETS = [];
 const CACHE = `rda-shell-v2:${BUILD_ASSETS.join('|')}`;
-const PAGES = ['/', '/privacy/', '/terms/'];
-const SHELL = [...PAGES, ...BUILD_ASSETS, '/mark.svg', '/art/restore-proof-press-720.webp', '/art/restore-proof-press-1200.webp'];
+const PAGES = ['/', '/?demo=1', '/privacy/', '/terms/', '/404.html'];
+const SHELL = [...PAGES, ...BUILD_ASSETS, '/mark.svg', '/apple-touch-icon.png', '/og-image.jpg', '/sitemap.xml', '/art/restore-proof-press-720.webp', '/art/restore-proof-press-1200.webp'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => Promise.all(SHELL.map(async path => {

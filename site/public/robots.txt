@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://restore-drill-attestor.sociobot.in/sitemap.xml

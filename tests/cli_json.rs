@@ -5,6 +5,46 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 #[test]
+fn demo_command_runs_bundled_sample_in_a_temporary_sandbox() {
+    let consumer_directory = tempfile::tempdir().unwrap();
+    let sentinel = consumer_directory.path().join("existing-user-data");
+    fs::write(&sentinel, "untouched").unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_restore-drill"))
+        .args(["demo", "--json"])
+        .current_dir(consumer_directory.path())
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stderr.is_empty());
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["demo"], true);
+    assert_eq!(result["status"], "passed");
+    assert_eq!(result["target_removed"], true);
+    assert_eq!(result["real_data_touched"], false);
+    assert_eq!(fs::read_to_string(&sentinel).unwrap(), "untouched");
+
+    let sandbox = std::path::PathBuf::from(result["sandbox"].as_str().unwrap());
+    let evidence_path = std::path::PathBuf::from(result["path"].as_str().unwrap());
+    assert!(sandbox.starts_with(std::env::temp_dir()));
+    assert!(evidence_path.starts_with(&sandbox));
+    assert!(evidence_path.is_file());
+    assert!(!sandbox.join("disposable-target").exists());
+
+    let evidence = fs::read_to_string(&evidence_path).unwrap();
+    assert!(!evidence.contains("acme-garden"));
+    assert!(!evidence.contains("customer database"));
+    assert!(!evidence.contains("account_id"));
+    fs::remove_dir_all(sandbox).unwrap();
+}
+
+#[test]
 fn unsafe_validate_error_is_machine_readable_in_json_mode() {
     let directory = tempfile::tempdir().unwrap();
     let config = directory.path().join("unsafe.toml");

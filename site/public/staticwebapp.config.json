@@ -1,7 +1,10 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/assets/*", "/art/*", "/privacy/*", "/terms/*"]
+    "exclude": ["/assets/*", "/art/*", "/privacy/*", "/terms/*", "/404.html", "/sitemap.xml", "/robots.txt", "/mark.svg", "/apple-touch-icon.png", "/og-image.jpg"]
+  },
+  "responseOverrides": {
+    "404": { "rewrite": "/404.html", "statusCode": 404 }
   },
   "globalHeaders": {
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://api.sociobot.in; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' https://api.sociobot.in; frame-ancestors 'none'; upgrade-insecure-requests",
@@ -22,6 +25,10 @@
     {
       "route": "/sw.js",
       "headers": { "Cache-Control": "no-cache" }
+    },
+    {
+      "route": "/sitemap.xml",
+      "headers": { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=3600" }
     }
   ]
 }

@@ -1,8 +1,10 @@
 use clap::{Parser, Subcommand};
 use restore_drill_attestor::{Error, Status, load_config, run};
 use serde_json::json;
+use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Parser)]
 #[command(
@@ -18,6 +20,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Action {
+    /// Run the bundled sample drill in a new temporary sandbox
+    Demo {
+        /// Print machine-readable output
+        #[arg(long)]
+        json: bool,
+    },
     /// Validate a drill file without executing any command
     Validate {
         /// TOML drill configuration
@@ -78,13 +86,16 @@ fn main() -> ExitCode {
 impl Cli {
     fn wants_json(&self) -> bool {
         match &self.command {
-            Action::Validate { json, .. } | Action::Run { json, .. } => *json,
+            Action::Demo { json } | Action::Validate { json, .. } | Action::Run { json, .. } => {
+                *json
+            }
         }
     }
 }
 
 fn execute(cli: Cli) -> Result<u8, Error> {
     match cli.command {
+        Action::Demo { json } => run_demo(json),
         Action::Validate { config, json } => {
             let (config, _) = load_config(&config)?;
             if json {
@@ -141,4 +152,152 @@ fn execute(cli: Cli) -> Result<u8, Error> {
             })
         }
     }
+}
+
+fn run_demo(json_output: bool) -> Result<u8, Error> {
+    const SAMPLE: &str = include_str!("../examples/demo-backup.tsv");
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| Error::Io(format!("could not create demo timestamp: {error}")))?
+        .as_nanos();
+    let sandbox = std::env::temp_dir().join(format!(
+        "restore-drill-attestor-demo-{}-{nonce}",
+        std::process::id()
+    ));
+    let sample = sandbox.join("bundled-backup.tsv");
+    let target = sandbox.join("disposable-target");
+    let evidence = sandbox.join("attestations");
+    let config_path = sandbox.join("restore-drill.toml");
+    fs::create_dir_all(&sandbox).map_err(|error| {
+        Error::Io(format!(
+            "could not create demo sandbox {}: {error}",
+            sandbox.display()
+        ))
+    })?;
+    fs::write(&sample, SAMPLE).map_err(|error| {
+        Error::Io(format!(
+            "could not write bundled sample {}: {error}",
+            sample.display()
+        ))
+    })?;
+
+    let target_id = format!("sample-target-{}-{nonce}", std::process::id());
+    let source = demo_config(&target_id, &sample, &target);
+    fs::write(&config_path, &source).map_err(|error| {
+        Error::Io(format!(
+            "could not write demo configuration {}: {error}",
+            config_path.display()
+        ))
+    })?;
+    let (config, source) = load_config(&config_path)?;
+    let result = run(&config, &source, &target_id, &evidence)?;
+    let passed = result.attestation.status == Status::Passed;
+
+    if json_output {
+        println!(
+            "{}",
+            json!({
+                "demo": true,
+                "status": result.attestation.status,
+                "attestation_id": result.attestation.attestation_id,
+                "path": result.path,
+                "sandbox": sandbox,
+                "sample": sample,
+                "target_removed": !target.exists(),
+                "real_data_touched": false
+            })
+        );
+    } else {
+        println!("Demo — bundled sample data in a new temporary sandbox.");
+        println!("Sample: {}", sample.display());
+        println!(
+            "{}: restore, 3 checks, and cleanup completed.",
+            if passed { "PASSED" } else { "FAILED" }
+        );
+        println!("Evidence: {}", result.path.display());
+        println!("Sandbox: {}", sandbox.display());
+        println!("No existing configuration, backup, or target was read or changed.");
+    }
+    Ok(if passed { 0 } else { 3 })
+}
+
+#[cfg(unix)]
+fn demo_config(target_id: &str, sample: &std::path::Path, target: &std::path::Path) -> String {
+    let sample = shell_quote(sample);
+    let target = shell_quote(target);
+    format!(
+        r#"version = 1
+attestation_ttl_days = 30
+
+[drill]
+name = "bundled customer database sample"
+
+[target]
+id = "{target_id}"
+isolated = true
+
+[commands]
+prepare = "mkdir -p {target}"
+restore = "cp {sample} {target}/restored.tsv"
+cleanup = "rm -rf {target}"
+timeout_seconds = 10
+
+[[checks]]
+name = "three customer records restored"
+kind = "row_count"
+command = "awk 'END {{ print NR - 1 }}' {target}/restored.tsv"
+min = 3
+max = 3
+timeout_seconds = 10
+
+[[checks]]
+name = "expected customer schema exists"
+kind = "schema"
+command = "head -n 1 {target}/restored.tsv"
+contains = "account_id"
+timeout_seconds = 10
+
+[[checks]]
+name = "restored application record is readable"
+kind = "application"
+command = "grep -q 'acme-garden' {target}/restored.tsv"
+timeout_seconds = 10
+"#
+    )
+}
+
+#[cfg(windows)]
+fn demo_config(target_id: &str, sample: &std::path::Path, target: &std::path::Path) -> String {
+    let sample = shell_quote(sample);
+    let target = shell_quote(target);
+    format!(
+        r#"version = 1
+attestation_ttl_days = 30
+[drill]
+name = "bundled customer database sample"
+[target]
+id = "{target_id}"
+isolated = true
+[commands]
+prepare = "mkdir {target}"
+restore = "copy {sample} {target}\\restored.tsv"
+cleanup = "rmdir /s /q {target}"
+timeout_seconds = 10
+[[checks]]
+name = "sample restored"
+kind = "application"
+command = "findstr /c:acme-garden {target}\\restored.tsv"
+timeout_seconds = 10
+"#
+    )
+}
+
+#[cfg(unix)]
+fn shell_quote(path: &std::path::Path) -> String {
+    format!("'{}'", path.to_string_lossy().replace('\'', "'\\''"))
+}
+
+#[cfg(windows)]
+fn shell_quote(path: &std::path::Path) -> String {
+    format!("\"{}\"", path.display())
 }

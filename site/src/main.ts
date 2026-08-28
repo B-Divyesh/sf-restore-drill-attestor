@@ -11,6 +11,18 @@ import {
 
 const select = <T extends Element>(selector: string): T | null => document.querySelector<T>(selector);
 const selectAll = <T extends Element>(selector: string): T[] => Array.from(document.querySelectorAll<T>(selector));
+const demoMode = new URLSearchParams(location.search).get('demo') === '1';
+const demoPrefix = 'demo:';
+
+function localKey(key: string): string {
+  return demoMode ? `${demoPrefix}${key}` : key;
+}
+
+function clearDemoStorage(): void {
+  Object.keys(localStorage)
+    .filter(key => key.startsWith(demoPrefix))
+    .forEach(key => localStorage.removeItem(key));
+}
 
 function setConnectionState(online = navigator.onLine): void {
   const strip = select<HTMLElement>('[data-connection]');
@@ -116,6 +128,20 @@ async function runDemo(shouldFail: boolean): Promise<void> {
 select<HTMLButtonElement>('[data-run-demo]')?.addEventListener('click', () => void runDemo(false));
 select<HTMLButtonElement>('[data-fail-demo]')?.addEventListener('click', () => void runDemo(true));
 
+if (demoMode) {
+  document.title = 'Demo — Restore Drill Attestor';
+  const banner = select<HTMLElement>('[data-demo-banner]');
+  if (banner) banner.hidden = false;
+  window.setTimeout(() => void runDemo(false), 0);
+}
+
+select<HTMLButtonElement>('[data-reset-demo]')?.addEventListener('click', () => {
+  clearDemoStorage();
+  demoRun += 1;
+  void runDemo(false);
+});
+select<HTMLAnchorElement>('[data-start-real]')?.addEventListener('click', clearDemoStorage);
+
 const licenseForm = select<HTMLFormElement>('[data-license-form]');
 const licenseStatus = select<HTMLElement>('[data-license-status]');
 const operatorContent = select<HTMLElement>('[data-operator-content]');
@@ -144,9 +170,9 @@ async function verifyLicense(token: string, optimistic = false): Promise<void> {
     if (!response.ok) throw new Error('verification unavailable');
     const data = await response.json() as { valid?: boolean; reason?: string };
     const verdict: Verdict = { valid: data.valid === true, reason: data.reason || 'invalid', checkedAt: Date.now(), token };
-    localStorage.setItem(VERDICT_KEY, JSON.stringify(verdict));
+    localStorage.setItem(localKey(VERDICT_KEY), JSON.stringify(verdict));
     showUnlocked(verdict.valid);
-    setLicenseStatus(verdict.valid ? 'License active. Operator Pack unlocked below.' : 'License no longer active. You can purchase a new license.', verdict.valid ? 'valid' : 'invalid');
+    setLicenseStatus(verdict.valid ? 'License active. Operator Pack is available below.' : 'License no longer active. You can purchase a new license.', verdict.valid ? 'valid' : 'invalid');
   } catch {
     setLicenseStatus('Could not verify right now. The free CLI and documentation are still available.', 'quiet');
   }
@@ -155,10 +181,10 @@ async function verifyLicense(token: string, optimistic = false): Promise<void> {
 function initializeLicense(): void {
   if (!licenseForm) return;
   const returned = returnedLicense(new URL(location.href));
-  let token = localStorage.getItem(LICENSE_KEY)?.trim() || '';
+  let token = localStorage.getItem(localKey(LICENSE_KEY))?.trim() || '';
   if (returned.token) {
     token = returned.token;
-    localStorage.setItem(LICENSE_KEY, token);
+    localStorage.setItem(localKey(LICENSE_KEY), token);
     history.replaceState({}, '', returned.cleanUrl);
     showUnlocked(true);
     setLicenseStatus('Purchase returned. Verifying your license…', 'quiet');
@@ -166,10 +192,10 @@ function initializeLicense(): void {
     return;
   }
   if (!token) return;
-  const verdict = parseVerdict(localStorage.getItem(VERDICT_KEY));
+  const verdict = parseVerdict(localStorage.getItem(localKey(VERDICT_KEY)));
   if (verdict?.token === token) {
     showUnlocked(verdict.valid);
-    setLicenseStatus(verdict.valid ? 'License active. Operator Pack unlocked below.' : 'License no longer active.', verdict.valid ? 'valid' : 'invalid');
+    setLicenseStatus(verdict.valid ? 'License active. Operator Pack is available below.' : 'License no longer active.', verdict.valid ? 'valid' : 'invalid');
   }
   if (!verdict || !verdictIsFresh(verdict, token)) void verifyLicense(token, verdict?.valid === true);
 }
@@ -189,14 +215,14 @@ licenseForm?.addEventListener('submit', event => {
     field?.focus();
     return;
   }
-  localStorage.setItem(LICENSE_KEY, token);
-  localStorage.removeItem(VERDICT_KEY);
+  localStorage.setItem(localKey(LICENSE_KEY), token);
+  localStorage.removeItem(localKey(VERDICT_KEY));
   void verifyLicense(token, true);
 });
 
 window.addEventListener('online', () => {
-  const token = localStorage.getItem(LICENSE_KEY)?.trim();
-  const verdict = parseVerdict(localStorage.getItem(VERDICT_KEY));
+  const token = localStorage.getItem(localKey(LICENSE_KEY))?.trim();
+  const verdict = parseVerdict(localStorage.getItem(localKey(VERDICT_KEY)));
   if (token && (!verdict || !verdictIsFresh(verdict, token))) void verifyLicense(token, verdict?.valid === true);
 });
 

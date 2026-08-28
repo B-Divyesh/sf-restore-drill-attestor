@@ -55,3 +55,8 @@ responsive sizes (≤300 KB). Prompt metadata is retained beside the source
 image. CSS-authored dot screens and registration crosses are original project
 elements. License: project artwork, © 2026 Sociobot, distributed with this MIT
 repository.
+
+The 1200×630 social preview is a deterministic center crop of the original
+proof-press artwork. The 180×180 touch icon is hand-composed from the same ink,
+paper, signal-orange, circular press plate, and check-mark geometry. Both are
+original derivatives created locally with ImageMagick on 28 August 2026.

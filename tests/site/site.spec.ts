@@ -1,5 +1,62 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { execFile } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { promisify } from 'node:util';
+
+const exec = promisify(execFile);
+const repo = resolve(import.meta.dirname, '../..');
+
+async function runCli(args: string[], cwd = repo) {
+  return exec('cargo', ['run', '--quiet', '--manifest-path', join(repo, 'Cargo.toml'), '--', ...args], { cwd, timeout: 60_000 });
+}
+
+test('@claim:demo-sandbox bundled CLI demo restores, checks, cleans up, and prints evidence', async () => {
+  const consumer = await mkdtemp(join(tmpdir(), 'rda-claim-consumer-'));
+  try {
+    const sentinel = join(consumer, 'existing-user-data');
+    await writeFile(sentinel, 'untouched');
+    const { stdout, stderr } = await runCli(['demo', '--json'], consumer);
+    expect(stderr).toBe('');
+    const result = JSON.parse(stdout) as Record<string, unknown>;
+    expect(result).toMatchObject({ demo: true, status: 'passed', target_removed: true, real_data_touched: false });
+    expect(String(result.path)).toContain(String(result.sandbox));
+    expect(await readFile(String(result.path), 'utf8')).toContain('"status": "passed"');
+    expect(await readFile(sentinel, 'utf8')).toBe('untouched');
+    await rm(String(result.sandbox), { recursive: true });
+  } finally {
+    await rm(consumer, { recursive: true, force: true });
+  }
+});
+
+test('@claim:evidence-minimization demo evidence omits sample values, labels, commands, and output', async () => {
+  const { stdout } = await runCli(['demo', '--json']);
+  const result = JSON.parse(stdout) as { path: string; sandbox: string };
+  try {
+    const evidence = await readFile(result.path, 'utf8');
+    for (const privateValue of ['acme-garden', 'account_id', 'bundled customer database sample', 'three customer records restored', 'grep -q', 'restored.tsv']) {
+      expect(evidence).not.toContain(privateValue);
+    }
+    expect(evidence).toContain('"check_id": "check-1"');
+  } finally {
+    await rm(result.sandbox, { recursive: true, force: true });
+  }
+});
+
+test('@claim:target-safety production-looking targets are refused before commands run', async () => {
+  const consumer = await mkdtemp(join(tmpdir(), 'rda-claim-safety-'));
+  try {
+    const marker = join(consumer, 'command-ran');
+    const config = join(consumer, 'unsafe.toml');
+    await writeFile(config, `version = 1\n[drill]\nname = "unsafe"\n[target]\nid = "production01"\nisolated = true\n[commands]\nrestore = "touch ${marker}"\ncleanup = "true"\n[[checks]]\nname = "smoke"\nkind = "command"\ncommand = "true"\n`);
+    await expect(runCli(['run', '--config', config, '--confirm', 'production01'], consumer)).rejects.toMatchObject({ code: 2 });
+    await expect(readFile(marker)).rejects.toThrow();
+  } finally {
+    await rm(consumer, { recursive: true, force: true });
+  }
+});
 
 test('home is semantic, error-free, and accessible', async ({ page }) => {
   const errors: string[] = [];
@@ -51,6 +108,27 @@ test('deployment policy prevents framing and restricts executable content', asyn
   expect(policy.globalHeaders['X-Frame-Options']).toBe('DENY');
   expect(policy.globalHeaders['Content-Security-Policy']).toContain("frame-ancestors 'none'");
   expect(policy.globalHeaders['Content-Security-Policy']).toContain("script-src 'self'");
+  expect(policy.responseOverrides['404']).toEqual({ rewrite: '/404.html', statusCode: 404 });
+});
+
+test('social metadata, touch icon, sitemap, and designed 404 are shipped', async ({ page, request }) => {
+  await page.goto('/');
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /og-image\.jpg$/);
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image');
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', '/apple-touch-icon.png');
+  for (const path of ['/og-image.jpg', '/apple-touch-icon.png']) {
+    const response = await request.get(path);
+    expect(response.ok()).toBe(true);
+  }
+  const sitemap = await request.get('/sitemap.xml');
+  expect(sitemap.headers()['content-type']).toContain('xml');
+  expect(await sitemap.text()).toContain('<loc>https://restore-drill-attestor.sociobot.in/privacy/</loc>');
+
+  await page.goto('/404.html');
+  await expect(page).toHaveTitle('Page not found — Restore Drill Attestor');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('This page did not restore.');
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations.filter(violation => ['critical', 'serious'].includes(violation.impact || ''))).toEqual([]);
 });
 
 test('sample drill shows success and failure with cleanup', async ({ page }) => {
@@ -84,7 +162,7 @@ test('offline state is explicit and layout fits the viewport', async ({ page, co
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
-test('service worker updates and keeps the product usable after an offline reload', async ({ page, context }) => {
+test('@claim:offline-reload service worker keeps docs and demo usable after an offline reload', async ({ page, context }) => {
   await page.goto('/');
   await page.evaluate(async () => {
     const registration = await navigator.serviceWorker.ready;
@@ -110,11 +188,16 @@ test('service worker updates and keeps the product usable after an offline reloa
   await expect(page.locator('[data-sheet-status]')).toHaveText('PASSED', { timeout: 6_000 });
 });
 
-test('clean first load stays first-party and keyboard flows retain visible focus', async ({ page }) => {
+test('@claim:site-local-only clean demo flow sends no third-party request', async ({ page }) => {
   const origins = new Set<string>();
   page.on('request', request => origins.add(new URL(request.url()).origin));
-  await page.goto('/');
+  await page.goto('/?demo=1#demo');
+  await expect(page.locator('[data-sheet-status]')).toHaveText('PASSED', { timeout: 6_000 });
   expect([...origins]).toEqual([new URL(page.url()).origin]);
+});
+
+test('keyboard flows retain visible focus', async ({ page }) => {
+  await page.goto('/');
 
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
@@ -128,6 +211,38 @@ test('clean first load stays first-party and keyboard flows retain visible focus
   await page.getByRole('button', { name: 'Have a license? Paste it' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByLabel('License token')).toBeFocused();
+});
+
+test('@claim:operator-pack the page states the one-time price and verifies a restored license', async ({ page }) => {
+  await page.route('https://api.sociobot.in/**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ valid: true, reason: 'ok', expires_at: null })
+  }));
+  await page.goto('/?license=claim-token#operator-pack');
+  await expect(page.locator('.price-ticket')).toContainText('$39');
+  await expect(page.locator('.price-ticket')).toContainText('one-time purchase');
+  await expect(page.locator('[data-operator-content]')).toBeVisible();
+  await expect(page.locator('[data-license-status]')).toContainText('License active');
+});
+
+test('first-screen sample action enters an isolated, resettable demo namespace', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    localStorage.setItem('sb_license:restore-drill-attestor', 'real-license');
+    localStorage.setItem('sb_license_verdict:restore-drill-attestor', JSON.stringify({ valid: true, reason: 'ok', checkedAt: Date.now(), token: 'real-license' }));
+  });
+  await page.getByRole('link', { name: 'Try it with sample data' }).click();
+  await expect(page).toHaveTitle('Demo — Restore Drill Attestor');
+  await expect(page.locator('[data-demo-banner]')).toBeVisible();
+  await expect(page.locator('[data-operator-content]')).toBeHidden();
+  await expect(page.locator('[data-sheet-status]')).toHaveText('PASSED', { timeout: 6_000 });
+  expect(await page.evaluate(() => localStorage.getItem('sb_license:restore-drill-attestor'))).toBe('real-license');
+  await page.getByRole('button', { name: 'Reset demo' }).click();
+  await expect(page.locator('[data-sheet-status]')).toHaveText('PASSED', { timeout: 6_000 });
+  await page.getByRole('link', { name: 'Start for real' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('[data-demo-banner]')).toBeHidden();
 });
 
 test('an invalid license relocks paid content without blocking the free product', async ({ page }) => {

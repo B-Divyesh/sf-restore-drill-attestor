@@ -23,6 +23,20 @@ binary-release publication remain factory-owned.
 
 ## Usage
 
+Try the complete lifecycle first with the bundled sample. It uses a new
+temporary directory, never reads your configuration or data, removes its
+disposable target, and prints the evidence path:
+
+```sh
+restore-drill demo
+restore-drill demo --json
+```
+
+The browser preview is one click away at
+<https://restore-drill-attestor.sociobot.in/?demo=1#demo>. Its persistent demo
+banner provides reset and exit controls; browser demo state uses only the
+`demo:` storage namespace. See [.factory/demo.md](.factory/demo.md).
+
 Create `restore-drill.toml`:
 
 ```toml
@@ -108,6 +122,9 @@ npm run build       # CLI release build + static site -> dist/
 npm run build:site  # static site only -> dist/site/
 npm run test:e2e    # Chromium desktop + 390px mobile
 ```
+
+Public product claims and their exact sandbox checks are listed in
+[.factory/claims.json](.factory/claims.json).
 
 The landing/docs site uses Vite and vanilla TypeScript. It has no analytics,
 third-party runtime assets, or server-side data storage. License tokens for the
