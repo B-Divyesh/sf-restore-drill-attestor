@@ -10,12 +10,16 @@ evidence without sending backups or production data to another service.
 
 ## Install
 
-Download a release binary, or build from source with Rust 1.85+:
+Install the current release directly from its public source repository with
+Rust 1.85+:
 
 ```sh
-cargo install --path .
+cargo install --git https://github.com/B-Divyesh/sf-restore-drill-attestor.git --locked
 restore-drill --help
 ```
+
+For local development, use `cargo install --path . --locked`. Registry and
+binary-release publication remain factory-owned.
 
 ## Usage
 
@@ -88,13 +92,17 @@ runnable local example.
 
 ```sh
 cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 cargo build --release
 cargo package --allow-dirty
 npm ci
 npm test
+npm run typecheck
+npm run lint
 npm run build       # CLI release build + static site -> dist/
 npm run build:site  # static site only -> dist/site/
+npm run test:e2e    # Chromium desktop + 390px mobile
 ```
 
 The landing/docs site uses Vite and vanilla TypeScript. It has no analytics,

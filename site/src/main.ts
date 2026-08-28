@@ -12,16 +12,29 @@ import {
 const select = <T extends Element>(selector: string): T | null => document.querySelector<T>(selector);
 const selectAll = <T extends Element>(selector: string): T[] => Array.from(document.querySelectorAll<T>(selector));
 
-function setConnectionState(): void {
+function setConnectionState(online = navigator.onLine): void {
   const strip = select<HTMLElement>('[data-connection]');
   if (!strip) return;
-  strip.hidden = navigator.onLine;
-  strip.textContent = navigator.onLine ? '' : 'Offline — cached documentation and the free demo remain available. License verification will resume when connected.';
+  strip.hidden = online;
+  strip.textContent = online ? '' : 'Offline — cached documentation and the free demo remain available. License verification will resume when connected.';
 }
 
-window.addEventListener('online', setConnectionState);
-window.addEventListener('offline', setConnectionState);
-setConnectionState();
+async function checkConnectionState(): Promise<void> {
+  if (!navigator.onLine) {
+    setConnectionState(false);
+    return;
+  }
+  try {
+    const response = await fetch('/robots.txt', { method: 'HEAD', cache: 'no-store' });
+    setConnectionState(response.ok);
+  } catch {
+    setConnectionState(false);
+  }
+}
+
+window.addEventListener('online', () => void checkConnectionState());
+window.addEventListener('offline', () => setConnectionState(false));
+void checkConnectionState();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => undefined));

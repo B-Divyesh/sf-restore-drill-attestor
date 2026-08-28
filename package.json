@@ -7,6 +7,8 @@
     "dev": "vite --config site/vite.config.ts",
     "test": "cargo test && vitest run site/src",
     "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings && npm run typecheck",
     "build": "cargo build --release && npm run build:site",
     "build:site": "vite build --config site/vite.config.ts"
   },
@@ -14,6 +16,8 @@
     "@axe-core/playwright": "4.10.2",
     "@fontsource-variable/bricolage-grotesque": "5.2.9",
     "@playwright/test": "1.58.2",
+    "@types/node": "^24.3.0",
+    "playwright-core": "^1.58.2",
     "typescript": "5.9.2",
     "vite": "7.3.6",
     "vitest": "3.2.7"

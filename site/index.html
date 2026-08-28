@@ -60,7 +60,7 @@
         </div>
         <div class="terminal" aria-label="Installation and first-run commands">
           <div class="terminal-bar"><span>shell / restore-drill</span><button class="copy-button" type="button" data-copy-target="install-code">Copy commands</button></div>
-          <pre id="install-code" tabindex="0"><code><span class="prompt">$</span> cargo install restore-drill-attestor
+          <pre id="install-code" tabindex="0"><code><span class="prompt">$</span> cargo install --git https://github.com/B-Divyesh/sf-restore-drill-attestor.git --locked
 <span class="prompt">$</span> restore-drill validate --config restore-drill.toml
 <span class="prompt">$</span> restore-drill run --config restore-drill.toml \
     --confirm local-restore-drill --output ./attestations</code></pre>

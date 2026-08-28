@@ -24,7 +24,8 @@ The display face is self-hosted **Bricolage Grotesque**, chosen for blunt,
 tool-label headlines without becoming a terminal cliché. Operational copy uses
 the system monospace stack because commands and durations must align. One local
 Latin WOFF2 file is subset and kept under the 120 KB font budget. Type steps are
-14/16/20/28/48/72px. Spacing follows an 8px base with 4px optical corrections;
+16/20/28/48/72px; even compact evidence labels stay at the 16px baseline.
+Spacing follows an 8px base with 4px optical corrections;
 the content rail is 1184px and prose stops at 68 characters.
 
 ## Interaction grammar and depth

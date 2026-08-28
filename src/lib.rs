@@ -2,8 +2,8 @@ use chrono::{DateTime, Days, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
-use std::fs;
-use std::io;
+use std::fs::{self, OpenOptions};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -172,11 +172,9 @@ pub fn validate_config(config: &Config) -> Result<(), Error> {
         ));
     }
     let target = config.target.id.to_ascii_lowercase();
-    let risky = ["prod", "production", "live"].iter().any(|word| {
-        target
-            .split(|character: char| !character.is_ascii_alphanumeric())
-            .any(|part| part == *word)
-    });
+    let risky = ["prod", "production", "live"]
+        .iter()
+        .any(|word| target.contains(word));
     if risky {
         return Err(Error::Config(
             "target.id looks production-like; use a clearly disposable drill target".into(),
@@ -266,6 +264,8 @@ pub fn run(
     confirmation: &str,
     output_dir: &Path,
 ) -> Result<RunResult, Error> {
+    // Keep the destructive boundary inside the library API as well as the CLI's loader.
+    validate_config(config)?;
     if confirmation != config.target.id {
         return Err(Error::Config(format!(
             "confirmation refused: --confirm must exactly equal target.id {:?}",
@@ -335,7 +335,7 @@ pub fn run(
     let config_hash = format!("{:x}", Sha256::digest(source.as_bytes()));
     let timestamp = started_at.format("%Y%m%dT%H%M%SZ").to_string();
     let attestation_id = format!("{}-{timestamp}", slug(&config.drill.name));
-    let attestation = Attestation {
+    let mut attestation = Attestation {
         schema_version: 1,
         attestation_id: attestation_id.clone(),
         tool: Tool {
@@ -354,7 +354,7 @@ pub fn run(
         checks,
         privacy: "No commands, stdout, stderr, query results, schema values, or secrets recorded.",
     };
-    let path = write_attestation(output_dir, &attestation_id, &attestation)?;
+    let path = write_attestation(output_dir, &mut attestation)?;
     Ok(RunResult { attestation, path })
 }
 
@@ -379,34 +379,53 @@ fn slug(value: &str) -> String {
         .join("-")
 }
 
-fn write_attestation(
-    output_dir: &Path,
-    attestation_id: &str,
-    attestation: &Attestation,
-) -> Result<PathBuf, Error> {
+fn write_attestation(output_dir: &Path, attestation: &mut Attestation) -> Result<PathBuf, Error> {
     fs::create_dir_all(output_dir).map_err(|error| {
         Error::Io(format!(
             "could not create output directory {}: {error}",
             output_dir.display()
         ))
     })?;
-    let path = output_dir.join(format!("{attestation_id}.json"));
-    let temp_path = output_dir.join(format!(".{attestation_id}.json.tmp"));
-    let json = serde_json::to_vec_pretty(attestation)
-        .map_err(|error| Error::Io(format!("could not serialize attestation: {error}")))?;
-    fs::write(&temp_path, json).map_err(|error| {
-        Error::Io(format!(
-            "could not write attestation {}: {error}",
-            temp_path.display()
-        ))
-    })?;
-    fs::rename(&temp_path, &path).map_err(|error| {
-        Error::Io(format!(
-            "could not finalize attestation {}: {error}",
-            path.display()
-        ))
-    })?;
-    Ok(path)
+    let base_id = attestation.attestation_id.clone();
+    for sequence in 1_u32.. {
+        let candidate_id = if sequence == 1 {
+            base_id.clone()
+        } else {
+            format!("{base_id}-{sequence}")
+        };
+        let path = output_dir.join(format!("{candidate_id}.json"));
+        let file = OpenOptions::new().write(true).create_new(true).open(&path);
+        let mut file = match file {
+            Ok(file) => file,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(Error::Io(format!(
+                    "could not create attestation {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+
+        attestation.attestation_id = candidate_id;
+        let write_result = serde_json::to_writer_pretty(&mut file, attestation)
+            .map_err(|error| Error::Io(format!("could not serialize attestation: {error}")))
+            .and_then(|()| {
+                file.write_all(b"\n")
+                    .and_then(|()| file.sync_all())
+                    .map_err(|error| {
+                        Error::Io(format!(
+                            "could not write attestation {}: {error}",
+                            path.display()
+                        ))
+                    })
+            });
+        if let Err(error) = write_result {
+            let _ = fs::remove_file(&path);
+            return Err(error);
+        }
+        return Ok(path);
+    }
+    unreachable!("attestation sequence space exhausted")
 }
 
 struct CommandResult {
@@ -599,6 +618,19 @@ timeout_seconds = 2
     }
 
     #[test]
+    fn refuses_concatenated_production_named_targets() {
+        for target in ["production01", "prodwest", "livedb", "myproductionbackup"] {
+            let mut cfg = config(VALID);
+            cfg.target.id = target.into();
+            let error = validate_config(&cfg).unwrap_err();
+            assert!(
+                error.to_string().contains("production-like"),
+                "unexpected error for {target}: {error}"
+            );
+        }
+    }
+
+    #[test]
     fn exact_confirmation_is_mandatory() {
         let cfg = config(VALID);
         let directory = tempfile::tempdir().unwrap();
@@ -615,6 +647,35 @@ timeout_seconds = 2
         assert_eq!(result.attestation.status, Status::Failed);
         assert_eq!(result.attestation.stages.last().unwrap().stage, "cleanup");
         assert_eq!(result.attestation.stages.last().unwrap().status, "passed");
+    }
+
+    #[test]
+    fn immediate_runs_keep_distinct_attestations() {
+        let cfg = config(VALID);
+        let directory = tempfile::tempdir().unwrap();
+        let first = run(&cfg, VALID, "local-drill", directory.path()).unwrap();
+        let second = run(&cfg, VALID, "local-drill", directory.path()).unwrap();
+
+        assert_ne!(first.path, second.path);
+        assert_ne!(
+            first.attestation.attestation_id,
+            second.attestation.attestation_id
+        );
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn concurrent_runs_keep_distinct_attestations() {
+        let cfg = config(VALID);
+        let directory = tempfile::tempdir().unwrap();
+        let paths = thread::scope(|scope| {
+            let first = scope.spawn(|| run(&cfg, VALID, "local-drill", directory.path()).unwrap());
+            let second = scope.spawn(|| run(&cfg, VALID, "local-drill", directory.path()).unwrap());
+            [first.join().unwrap().path, second.join().unwrap().path]
+        });
+
+        assert_ne!(paths[0], paths[1]);
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
     }
 
     #[test]

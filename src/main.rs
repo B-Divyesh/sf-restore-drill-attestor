@@ -45,20 +45,46 @@ enum Action {
 }
 
 fn main() -> ExitCode {
-    match execute() {
+    let cli = Cli::parse();
+    let json = cli.wants_json();
+    match execute(cli) {
         Ok(code) => ExitCode::from(code),
         Err(error) => {
-            eprintln!("restore-drill: {error}");
-            ExitCode::from(match error {
+            let exit_code = match error {
                 Error::Config(_) => 2,
                 Error::Io(_) => 3,
-            })
+            };
+            if json {
+                let kind = match error {
+                    Error::Config(_) => "configuration",
+                    Error::Io(_) => "io",
+                };
+                eprintln!(
+                    "{}",
+                    json!({
+                        "ok": false,
+                        "error": { "kind": kind, "message": error.to_string() },
+                        "exit_code": exit_code
+                    })
+                );
+            } else {
+                eprintln!("restore-drill: {error}");
+            }
+            ExitCode::from(exit_code)
         }
     }
 }
 
-fn execute() -> Result<u8, Error> {
-    match Cli::parse().command {
+impl Cli {
+    fn wants_json(&self) -> bool {
+        match &self.command {
+            Action::Validate { json, .. } | Action::Run { json, .. } => *json,
+        }
+    }
+}
+
+fn execute(cli: Cli) -> Result<u8, Error> {
+    match cli.command {
         Action::Validate { config, json } => {
             let (config, _) = load_config(&config)?;
             if json {
