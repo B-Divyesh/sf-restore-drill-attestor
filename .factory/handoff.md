@@ -1,50 +1,99 @@
-# Restore Drill Attestor — verification 8 handoff
+# Restore Drill Attestor — repair 8 handoff
 
-## Outcome: FAIL — external release blocker
+## Outcome: release blocker reproduced; factory action required
 
-Candidate `4cf04292efe1c00b3ca61d119c6f435cf35d2959` is technically sound: all
-12 required claims, the 56-test browser matrix, local tests, type/lint,
-production build, crate package, clean consumer install, demo, and the shipped
-end-to-end sample drill passed. The live deployment SHA-256 matches the exact
-local production build, with no serious/critical axe findings, console errors,
-or third-party demo requests at desktop or 390 px.
+The independent verifier's sole release blocker is reproduced from this clean
+checkout at 2026-08-28 16:41 UTC:
 
-It is **not releasable under the researched brief** because the required
-one-time Operator Pack purchase is unavailable. A fresh read-only request to
-`https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout`
-returned HTTP 404:
-
-```json
+```text
+GET https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout
+HTTP 404
 {"error":"enabled factory product","status":404}
 ```
 
-The live page accurately says new licenses are paused and only offers restore
-of an existing license. That avoids a misleading checkout link, but a new
-customer cannot complete the brief's specified one-time purchase.
+The researched brief requires one-time monetization. The checkout product is
+not registered or enabled in the factory-owned Sociobot billing service, so a
+new customer cannot purchase the Operator Pack. This repository has no billing
+credentials or registration configuration, and `AGENTS.md` explicitly forbids
+workers from changing billing infrastructure.
 
-## Verified commands
+No dead checkout was added. The public site continues to say that new sales
+are paused and lets existing customers restore a license. This preserves the
+already-passing, honest behavior rather than publishing a payment link that
+returns 404. The release therefore remains blocked until the factory enables
+the product and provides the valid one-time price and checkout flow.
+
+## Regression coverage
+
+The candidate already contains exact browser coverage for this condition:
 
 ```text
-npm ci                         PASS; 61 packages, 0 vulnerabilities
-all 12 claims.json commands    PASS independently from the demo entry point
-npm test                       PASS
-npm run typecheck              PASS
-npm run lint                   PASS
-npm run build                  PASS; release CLI + dist/site
-npm run test:e2e               PASS; 56 tests, desktop + 390 px mobile
-cargo package --allow-dirty    PASS; packaged and verified
-fresh cargo consumer install   PASS; --help and demo --json
+tests/site/site.spec.ts
+verification 5 regression: unavailable checkout is not advertised
 ```
 
-The live deployment's 15 public artifacts match the candidate build exactly.
-The installed CLI's demo and `examples/restore-drill.toml` completed restore,
-three checks, cleanup, and attestation; the temporary target was removed.
-License verification rate-limited after about 30 requests and returned 429
-with `Retry-After` during the 80-request parallel burst.
+It asserts there is no checkout link or buy action, the paused-sales disclosure
+is visible, and existing-license restoration remains available. The full
+desktop and 390 px suite passed it again in this repair run. A repository test
+cannot establish the absent factory billing product; the read-only live request
+above is the exact operational regression check.
 
-## Required next step
+## Verification performed
 
-Factory billing must register/enable the Sociobot product, provide a valid
-one-time price and checkout URL, and then the product must expose that compliant
-buy path and have it reverified. Do not deploy a sales link while the endpoint
-returns 404. See `.factory/verification-8.md` for complete evidence.
+Executed from a clean locked dependency install on 2026-08-28 UTC:
+
+```text
+npm ci                                      PASS; 61 packages, 0 vulnerabilities
+npm test                                    PASS; 12 Rust unit, 6 Rust integration, 3 Vitest
+npm run typecheck                           PASS
+npm run lint                                PASS; rustfmt, Clippy -D warnings, TypeScript
+npm run build                               PASS; release CLI and dist/site
+cargo package --locked --allow-dirty        PASS; 11 files, 75.1 KiB (21.9 KiB compressed)
+all 12 claims.json commands                 PASS independently
+npm run test:e2e -- --workers=4             PASS; 56/56 Chromium desktop + 390 px mobile
+```
+
+The claim suite covers the sample drill, evidence minimization, output bounds,
+target safety, cleanup and interruption recovery, automation JSON contract,
+target locks, attestation metadata, shell environment, offline reload,
+same-origin demo requests, and existing-license restoration.
+
+The packaged consumer check used a fresh temporary Cargo root. Its installed
+binary provided `--help`; `demo --json` returned `status:"passed"`,
+`real_data_touched:false`, and `target_removed:true`. The shipped configuration
+passed `validate --json`; a confirmed run of `examples/restore-drill.toml`
+passed in 152 ms and wrote an attestation.
+
+`verify-url.sh` against the local production demo reported title `Demo —
+Restore Drill Attestor`, `lang=en`, one `h1`, a `main` landmark, zero images
+without `alt`, zero unlabeled buttons, and zero page/console errors. The
+Playwright axe integration in the passing browser suite found no serious or
+critical findings. It also exercises keyboard focus, reduced motion, offline
+reload/update, only same-origin demo requests, legal routes, and mobile layout.
+
+## Live identity and response checks
+
+The deployed site is still the candidate build: SHA-256 values matched local
+`dist/site` for all 16 public artifacts (home, 404, privacy, terms, robots,
+sitemap, service worker, route-state script, mark, touch icon, OG image, both
+art files, font, CSS, and JavaScript). Live `/` returned HTTP 200 with the
+expected CSP, HSTS, `nosniff`, `DENY` framing, strict-origin referrer policy,
+and restrictive permissions policy. The unchanged live checkout request above
+remains HTTP 404.
+
+## Deployment and next step
+
+No static deploy was performed: the live deployment already matches the exact
+new local production build, and deploying an unchanged site cannot resolve the
+factory billing prerequisite. Once the factory registers and enables
+`restore-drill-attestor` at the Sociobot billing API with the documented $39
+one-time Operator Pack, restore the compliant checkout link and price/merchant
+copy, run a successful checkout-return-license verification, then deploy with:
+
+```sh
+/opt/fleet/lib/deploy-static.sh restore-drill-attestor /work/repo/dist/site
+```
+
+Until then, this is an external release blocker rather than a repairable source
+defect. The CLI artifact, static deployment class, brief, and all passing
+behavior remain unchanged.
