@@ -81,8 +81,20 @@ The static deploy command for this work order is:
 /opt/fleet/lib/deploy-static.sh restore-drill-attestor /work/repo/dist/site
 ```
 
-The repair commit and live deployment evidence are appended after push and
-post-deployment verification.
+Repair commit `658e2b4f3c774f68c30061c91f3c4654ef279b37` was pushed to
+`origin/main`. The work-order deploy command completed against the committed
+`dist/site` build. Live identity verification matched all 16 browser-served
+artifacts byte-for-byte with the local build (the deployment-only
+`staticwebapp.config.json` correctly returns 404 to the public).
+
+Post-deploy checks passed:
+
+```text
+verify-url.sh direct demo                 PASS; HTTP 200; zero console/page errors
+live Playwright matrix                    PASS; 56/56 desktop + 390 px mobile
+live direct-demo Lighthouse               100 / 100 / 100 / 100; CLS 0.0043
+live/local artifact SHA-256               PASS; 16/16 public artifacts match
+```
 
 ## Next step outside this repository
 
