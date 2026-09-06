@@ -1,17 +1,14 @@
-# Restore Drill Attestor — verification 10 handoff
+# Restore Drill Attestor — repair 10 handoff
 
-## Decision: FAIL — release blocked
+## Status: release blocked by factory billing registration
 
-Independent QA tested commit `3c13e8c06f31384138ebfb9232aebe7612ef7d21`
-against <https://restore-drill-attestor.sociobot.in/> on 2026-08-28 UTC.
+No application source was changed. The current code is the last runtime
+implementation, `658e2b4f3c774f68c30061c91f3c4654ef279b37`; the prior
+documentation/review baseline was `38f3de920ae63a4a158d4fca45bcbea8a7e61fe9`.
+This repair's registration evidence is committed as
+`af5180ca1a34a8daad95f41912b0c3057444bd78`.
 
-The CLI, sample demo, claims, unit/integration/browser suites, package consumer
-exercise, build, privacy checks, accessibility checks, response headers,
-rate-limiting probe, and live artifact identity all pass. The live site matches
-the fresh candidate build byte-for-byte for 16 public artifacts.
-
-The release nevertheless **FAILS** the researched acceptance contract because
-the required one-time purchase path is absent:
+The live checkout was reproduced on 2026-09-06 UTC:
 
 ```text
 GET https://api.sociobot.in/api/v1/products/restore-drill-attestor/checkout
@@ -19,30 +16,69 @@ HTTP/2 404
 {"error":"enabled factory product","status":404}
 ```
 
-This is a **Critical** factory billing prerequisite. The page's honest
-“new licenses are not currently offered” copy avoids misleading users, but it
-does not meet the brief's specified one-time monetization. No product code was
-changed during verification.
+That is the remaining release blocker. Factory billing must enable the product,
+set the required one-time price, and validate a hosted checkout return before
+this product can release. The free CLI stays available and existing Operator
+Pack licenses can still be restored and verified locally.
 
-## Evidence and verification
+## What this repair added
 
-- All 12 exact `.factory/claims.json` commands passed through the shipped demo
-  entry point; the first-read/one-click-demo gate passed.
-- `npm ci`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`,
-  `npm run test:e2e -- --workers=2` (56/56), and
-  `cargo package --locked --allow-dirty` passed.
-- A packaged crate installed into a fresh consumer and its installed binary
-  passed `--help`, `demo --json`, `validate --json`, and confirmed `run --json`.
-- Live demo requests were same-origin only; live mobile axe found no
-  serious/critical issues, focus was visible, and no errors were observed.
-- Live security/caching headers are present; verification API rate limiting
-  began after 30 requests in the observed window, returning `429 Retry-After: 3`.
+- `.factory/catalog-description.txt`: verb-first, 74-character catalog copy;
+  copied to `/work/.evidence/catalog-description.txt`.
+- `/work/.evidence/billing-offer.json`: registration metadata for the actual
+  historical live Operator Pack offer — US $39 / 3,900 USD minor units, one
+  time — with the exact product origin, return URL, paid deliverables, merchant
+  of record, and existing license-validation endpoint. It contains no
+  credentials.
+- `.factory/verification-11.md`: current reproduction, test evidence, and
+  disposition of every earlier finding.
 
-See [.factory/verification-10.md](verification-10.md) for the exact command
-results, browser evidence, bundle sizes, and required follow-up.
+The price is evidence-backed by the previous independent live reports, not a
+new guess. Sales remain unadvertised until the factory endpoint returns a
+hosted checkout, so visitors are not sent to a dead purchase URL.
 
-## Next step
+## How verified
 
-Factory must enable the Sociobot billing product, set the one-time price, then
-restore checkout/price/merchant copy and validate a real checkout-returned
-license. Re-run independent QA before release.
+From a clean locked dependency install:
+
+```sh
+npm ci
+# Every exact command in .factory/claims.json (12/12 passed)
+npm test
+npm run typecheck
+npm run lint
+npm run build
+npm run test:e2e -- --workers=2
+cargo package --locked --allow-dirty
+```
+
+Results: Rust unit/integration and Vitest passed; the full Chromium desktop and
+390 px browser matrix passed 56/56; package verification passed. The packed
+crate was installed into a fresh consumer root, then its installed binary
+passed `--help`, `demo --json`, `validate --json`, and confirmed `run --json`.
+
+The local production build matches the live deployment byte-for-byte for all
+16 public artifacts. A fresh live desktop and phone context read the job,
+audience, and sample action before scrolling; each completed the sample,
+showed the persistent demo banner, reset safely, and left seeded real browser
+data unchanged. The live URL verifier passed with no console errors. Mobile
+Playwright axe found zero violations. The standalone axe CLI could not start
+its Selenium Chrome driver in this container; this environmental limitation is
+recorded in `verification-11.md`, while the pinned Playwright axe audit passed.
+
+## Required factory follow-up
+
+1. Register and enable `restore-drill-attestor` in the Sociobot billing API.
+2. Configure the Operator Pack as USD 39.00, one-time, with return URL
+   `https://restore-drill-attestor.sociobot.in/#operator-pack`.
+3. Confirm checkout redirects to that origin with a `license` query token.
+4. Restore the compliant buy link, exact price, and Sociobot/Dodo merchant
+   disclosure in the site only after checkout is live.
+5. Complete a real purchase-return-verification and revoked-license check, then
+   rerun the declared claims and release verification.
+
+## Known gap
+
+The product cannot itself enable a factory billing record. No payment provider,
+credentials, mock checkout, or invented price was added. Until the registration
+is complete, the researched one-time monetization requirement remains unmet.
